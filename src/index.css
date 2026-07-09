@@ -1,0 +1,74 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  overscroll-behavior-y: contain;
+  background: #f0f4f8;
+}
+
+/* Evita zoom en inputs en iOS */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* Scrollbar minimalista */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+/* Barra de navegación inferior: scroll horizontal suave en móvil */
+.nav-tabs {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 4px;
+  padding: 8px 6px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+.nav-tabs::-webkit-scrollbar { display: none; }
+
+/* Padding inferior del contenido para no quedar bajo la barra */
+.main-content {
+  padding: 20px 16px;
+  padding-bottom: calc(90px + env(safe-area-inset-bottom));
+}
+
+/* Modales: padding seguro para notch */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.modal-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px 20px 0 0;
+  padding: 24px 20px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  width: 100%;
+  max-width: 520px;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+@media (min-width: 520px) {
+  .modal-overlay {
+    align-items: center;
+    padding: 20px;
+  }
+  .modal-box {
+    border-radius: 20px;
+    padding-bottom: 24px;
+  }
+}
