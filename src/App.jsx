@@ -178,27 +178,82 @@ function ModuloClientes({ clientes, setClientes }) {
 }
 
 // ── COTIZACIONES ──────────────────────────────────────────────────────────────
+const SERVICIOS_CATALOGO = [
+  { id: "sv_inst",   nombre: "Instalación eléctrica",           precio: 150, tipo: "fijo" },
+  { id: "sv_cerco",  nombre: "Cerco eléctrico",                 precio: 0,   tipo: "metro" },
+  { id: "sv_cctv",   nombre: "Circuito cerrado (CCTV)",         precio: 0,   tipo: "libre" },
+  { id: "sv_alarma", nombre: "Sistema de alarma",               precio: 0,   tipo: "libre" },
+  { id: "sv_seg",    nombre: "Sistema de seguridad residencial", precio: 0,   tipo: "libre" },
+  { id: "sv_mant",   nombre: "Mantenimiento preventivo",        precio: 80,  tipo: "fijo" },
+  { id: "sv_otro",   nombre: "Otro servicio",                   precio: 0,   tipo: "libre" },
+];
+
 function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, inventario }) {
   const [modal, setModal] = useState(false);
   const [detalle, setDetalle] = useState(null);
   const [form, setForm] = useState({});
+  const [svTipo, setSvTipo] = useState("");
+  const [svMetros, setSvMetros] = useState("");
+  const [svCostoM, setSvCostoM] = useState("");
+  const [svPrecio, setSvPrecio] = useState("");
   const ac = ACENTOS.cotizaciones;
-  const nc = id => clientes.find(c => c.id === id)?.nombre || "—";
-  const calcTotal = (items, ins) => items.reduce((s, i) => s + (i.subtotal || 0), 0) + Number(ins || 0);
 
-  const agregarItem = modeloId => {
+  const nc = id => clientes.find(c => c.id === id)?.nombre || "—";
+
+  const calcTotal = items => items.reduce((s, i) => s + (i.subtotal || 0), 0);
+
+  const recalc = items => setForm(f => ({ ...f, items, total: calcTotal(items) }));
+
+  const agregarPlanta = modeloId => {
     const m = inventario.find(x => x.id === modeloId); if (!m) return;
-    const items = [...(form.items || []), { modeloId, nombre: m.nombre, cantidad: 1, precio: m.precio, subtotal: m.precio }];
-    setForm(f => ({ ...f, items, total: calcTotal(items, f.instalacion) }));
+    const items = [...(form.items || []), { id: uid(), tipo: "planta", nombre: m.nombre, cantidad: 1, precio: m.precio, subtotal: m.precio }];
+    recalc(items);
   };
-  const guardar = () => { if (!form.clienteId) return; setCotizaciones(p => p.find(x => x.id === form.id) ? p.map(x => x.id === form.id ? form : x) : [...p, form]); setModal(false); };
+
+  const agregarServicio = () => {
+    const sv = SERVICIOS_CATALOGO.find(s => s.id === svTipo); if (!sv) return;
+    let subtotal = 0, detNombre = sv.nombre, detalle = "";
+    if (sv.tipo === "metro") {
+      const m = Number(svMetros) || 0;
+      const c = Number(svCostoM) || 0;
+      subtotal = m * c;
+      detalle = `${m} m × $${c}/m`;
+    } else {
+      subtotal = Number(svPrecio) || sv.precio;
+    }
+    const items = [...(form.items || []), { id: uid(), tipo: "servicio", nombre: detNombre, detalle, cantidad: 1, precio: subtotal, subtotal }];
+    recalc(items);
+    setSvTipo(""); setSvMetros(""); setSvCostoM(""); setSvPrecio("");
+  };
+
+  const eliminarItem = id => {
+    const items = (form.items || []).filter(x => x.id !== id);
+    recalc(items);
+  };
+
+  const guardar = () => {
+    if (!form.clienteId) return;
+    setCotizaciones(p => p.find(x => x.id === form.id) ? p.map(x => x.id === form.id ? form : x) : [...p, form]);
+    setModal(false);
+  };
+
+  const svSeleccionado = SERVICIOS_CATALOGO.find(s => s.id === svTipo);
+  const esCerco = svSeleccionado?.tipo === "metro";
+  const esLibre = svSeleccionado?.tipo === "libre";
+
+  const inputSt = { background: BG_INPUT, border: `1.5px solid ${BORDER}`, borderRadius: 10, color: TEXT_MAIN, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", width: "100%" };
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>📋 Cotizaciones</h2>
-        <Btn onClick={() => { setForm({ id: uid(), clienteId: clientes[0]?.id || "", fecha: hoy(), estado: "Pendiente", items: [], instalacion: 0, total: 0, notas: "" }); setModal(true); }} color={ac} small>+ Nueva</Btn>
+        <Btn onClick={() => {
+          setForm({ id: uid(), clienteId: clientes[0]?.id || "", fecha: hoy(), estado: "Pendiente", items: [], total: 0, notas: "" });
+          setSvTipo(""); setSvMetros(""); setSvCostoM(""); setSvPrecio("");
+          setModal(true);
+        }} color={ac} small>+ Nueva</Btn>
       </div>
+
       {cotizaciones.map(q => (
         <Card key={q.id} style={{ cursor: "pointer" }}>
           <div onClick={() => setDetalle(q)} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
@@ -219,20 +274,21 @@ function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, inventari
           )}
         </Card>
       ))}
+
       {detalle && (
         <div className="modal-overlay" onClick={() => setDetalle(null)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: "0 0 4px", color: ac }}>{nc(detalle.clienteId)}</h3>
             <p style={{ margin: "0 0 16px", color: TEXT_SUB, fontSize: 13 }}>{detalle.fecha}</p>
             {detalle.items.map((it, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${BORDER}` }}>
-                <span style={{ fontSize: 14 }}>{it.nombre} ×{it.cantidad}</span>
-                <span style={{ fontWeight: 700, color: ac }}>{usd(it.subtotal)}</span>
+              <div key={i} style={{ padding: "8px 0", borderBottom: `1px solid ${BORDER}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{it.nombre}</span>
+                  <span style={{ fontWeight: 700, color: ac }}>{usd(it.subtotal)}</span>
+                </div>
+                {it.detalle && <p style={{ margin: "2px 0 0", fontSize: 12, color: TEXT_SUB }}>{it.detalle}</p>}
               </div>
             ))}
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${BORDER}` }}>
-              <span style={{ fontSize: 14, color: TEXT_SUB }}>Instalación</span><span style={{ fontWeight: 700 }}>{usd(detalle.instalacion)}</span>
-            </div>
             <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", fontWeight: 800, fontSize: 16 }}>
               <span>TOTAL</span><span style={{ color: ac }}>{usd(detalle.total)}</span>
             </div>
@@ -241,28 +297,87 @@ function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, inventari
           </div>
         </div>
       )}
+
       {modal && (
         <div className="modal-overlay" onClick={() => setModal(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: "0 0 20px", color: ac }}>Nueva Cotización</h3>
-            <Sel label="Cliente" value={form.clienteId || ""} onChange={v => setForm(f => ({ ...f, clienteId: v }))} options={clientes.map(c => ({ value: c.id, label: c.nombre }))} />
+            <h3 style={{ margin: "0 0 16px", color: ac }}>Nueva Cotización</h3>
+
+            <Sel label="Cliente" value={form.clienteId || clientes[0]?.id || ""} onChange={v => setForm(f => ({ ...f, clienteId: v }))} options={clientes.map(c => ({ value: c.id, label: c.nombre }))} />
             <Inp label="Fecha" value={form.fecha || hoy()} onChange={v => setForm(f => ({ ...f, fecha: v }))} type="date" />
-            <label style={{ fontSize: 12, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 8 }}>Agregar modelo</label>
-            <select onChange={e => { agregarItem(e.target.value); e.target.value = ""; }} defaultValue=""
-              style={{ width: "100%", background: BG_INPUT, border: `1.5px solid ${BORDER}`, borderRadius: 10, color: TEXT_MAIN, padding: "12px 14px", fontSize: 14, marginBottom: 14, boxSizing: "border-box" }}>
-              <option value="" disabled>Selecciona un modelo...</option>
+
+            {/* Agregar planta */}
+            <label style={{ fontSize: 12, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 6 }}>⚡ Agregar planta / equipo</label>
+            <select onChange={e => { if (e.target.value) { agregarPlanta(e.target.value); e.target.value = ""; } }} value=""
+              style={{ ...inputSt, marginBottom: 14 }}>
+              <option value="">Selecciona un modelo...</option>
               {inventario.map(m => <option key={m.id} value={m.id}>{m.nombre} — {usd(m.precio)}</option>)}
             </select>
-            {(form.items || []).map((it, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${BORDER}`, fontSize: 14 }}>
-                <span>{it.nombre}</span><span style={{ fontWeight: 700 }}>{usd(it.subtotal)}</span>
+
+            {/* Agregar servicio */}
+            <label style={{ fontSize: 12, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 6 }}>🔧 Agregar servicio</label>
+            <select value={svTipo} onChange={e => { setSvTipo(e.target.value); setSvMetros(""); setSvCostoM(""); setSvPrecio(""); }}
+              style={{ ...inputSt, marginBottom: 10 }}>
+              <option value="">Selecciona un servicio...</option>
+              {SERVICIOS_CATALOGO.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select>
+
+            {esCerco && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Metros</label>
+                  <input type="number" value={svMetros} onChange={e => setSvMetros(e.target.value)} placeholder="Ej: 100" style={inputSt} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 4 }}>$/metro</label>
+                  <input type="number" value={svCostoM} onChange={e => setSvCostoM(e.target.value)} placeholder="Ej: 8" style={inputSt} />
+                </div>
               </div>
-            ))}
-            <Inp label="Costo instalación ($)" value={String(form.instalacion || 0)} onChange={v => { const ins = Number(v); setForm(f => ({ ...f, instalacion: ins, total: calcTotal(f.items || [], ins) })); }} type="number" />
-            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 16, margin: "8px 0 16px" }}>
+            )}
+            {(esLibre || (svSeleccionado?.tipo === "fijo")) && svTipo && (
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Costo ($)</label>
+                <input type="number" value={svPrecio} onChange={e => setSvPrecio(e.target.value)} placeholder={svSeleccionado?.precio ? `Sugerido: $${svSeleccionado.precio}` : "0"} style={inputSt} />
+              </div>
+            )}
+            {svTipo && (
+              <div style={{ marginBottom: 14 }}>
+                <Btn onClick={agregarServicio} color={ac} small>+ Agregar servicio</Btn>
+                {esCerco && svMetros && svCostoM && (
+                  <span style={{ fontSize: 13, color: TEXT_SUB, marginLeft: 10 }}>
+                    Subtotal: {usd(Number(svMetros) * Number(svCostoM))}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Lista de ítems */}
+            {(form.items || []).length > 0 && (
+              <div style={{ background: BG_INPUT, borderRadius: 10, padding: "10px 12px", marginBottom: 14 }}>
+                {(form.items || []).map(it => (
+                  <div key={it.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${BORDER}` }}>
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{it.nombre}</span>
+                      {it.detalle && <p style={{ margin: "1px 0 0", fontSize: 11, color: TEXT_SUB }}>{it.detalle}</p>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontWeight: 700, color: ac, fontSize: 13 }}>{usd(it.subtotal)}</span>
+                      <button onClick={() => eliminarItem(it.id)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 16, padding: 0 }}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Inp label="Notas" value={form.notas || ""} onChange={v => setForm(f => ({ ...f, notas: v }))} placeholder="Observaciones adicionales..." />
+
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 18, margin: "8px 0 16px", padding: "10px 0", borderTop: `2px solid ${ac}` }}>
               <span>TOTAL</span><span style={{ color: ac }}>{usd(form.total)}</span>
             </div>
-            <div style={{ display: "flex", gap: 10 }}><Btn onClick={guardar} color={ac} full>Guardar</Btn><Btn onClick={() => setModal(false)} color={TEXT_SUB} outline full>Cancelar</Btn></div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn onClick={guardar} color={ac} full>Guardar cotización</Btn>
+              <Btn onClick={() => setModal(false)} color={TEXT_SUB} outline full>Cancelar</Btn>
+            </div>
           </div>
         </div>
       )}
