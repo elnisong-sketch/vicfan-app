@@ -26,11 +26,19 @@ const aDataUrl = blob => new Promise((resolve, reject) => {
  * @param maxLado lado mayor en píxeles tras redimensionar
  * @param calidad 0-1 para el JPEG
  */
-export async function prepararImagen(file, maxLado = 600, calidad = 0.75) {
-  const blob = await comprimirImagen(file, maxLado, calidad);
+export async function prepararImagen(file, maxLado = 600, calidad = 0.75, tipo = "image/jpeg") {
+  const blob = await comprimirImagen(file, maxLado, calidad, tipo);
   const dataUrl = await aDataUrl(blob);
   return { dataUrl, bytes: blob.size, grande: blob.size > AVISO_BYTES };
 }
 
-/** Logo: se guarda algo más pequeño, solo tiene que leerse en la cabecera. */
-export const prepararLogo = file => prepararImagen(file, 400, 0.85);
+/**
+ * Logo: se guarda en PNG, no en JPEG.
+ *
+ * Un logo suele venir con el fondo transparente, y el JPEG no admite
+ * transparencia: lo convertiría en un recuadro de color alrededor del logo.
+ * El PNG lo conserva, y además comprime muy bien los colores planos de un
+ * logotipo, así que no sale más pesado. Va algo más pequeño porque solo tiene
+ * que leerse en la cabecera del presupuesto.
+ */
+export const prepararLogo = file => prepararImagen(file, 500, 1, "image/png");

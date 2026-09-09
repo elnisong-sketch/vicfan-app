@@ -45,7 +45,7 @@ function conAlmacen(modo, fn) {
  * A 1280 px y calidad 0.7 una foto queda en 100–200 KB y el número de serie
  * de una placa se sigue leyendo sin problema.
  */
-export async function comprimirImagen(file, maxLado = 1280, calidad = 0.7) {
+export async function comprimirImagen(file, maxLado = 1280, calidad = 0.7, tipo = "image/jpeg") {
   const bitmap = await createImageBitmap(file);
   const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
   const ancho = Math.round(bitmap.width * escala);
@@ -54,10 +54,18 @@ export async function comprimirImagen(file, maxLado = 1280, calidad = 0.7) {
   const canvas = document.createElement("canvas");
   canvas.width = ancho;
   canvas.height = alto;
-  canvas.getContext("2d").drawImage(bitmap, 0, 0, ancho, alto);
+  const ctx = canvas.getContext("2d");
+
+  // El JPEG no admite transparencia: sin este relleno, lo transparente sale
+  // negro. Se rellena de blanco, que es el color del papel y de la pantalla.
+  if (tipo === "image/jpeg") {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, ancho, alto);
+  }
+  ctx.drawImage(bitmap, 0, 0, ancho, alto);
   bitmap.close?.();
 
-  return new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", calidad));
+  return new Promise(resolve => canvas.toBlob(resolve, tipo, calidad));
 }
 
 export async function guardarFoto({ id, tareaId, tipo, file }) {
