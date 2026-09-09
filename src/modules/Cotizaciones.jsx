@@ -75,6 +75,10 @@ export const numeroPara = (cotizaciones, fecha, excluirId) => {
  *  guardado, así que se deduce de su fecha en vez de enseñar un hueco. */
 export const numeroVisible = q => q.numero || (q.fecha || "").replaceAll("-", "") || "—";
 
+/** Notas del presupuesto. Antes era una sola cadena; ahora son varias, y las
+ *  cotizaciones antiguas siguen leyéndose sin perder la que tuvieran. */
+export const notasDe = q => (Array.isArray(q.notas) ? q.notas : q.nota ? [q.nota] : []);
+
 export const cotizacionVacia = cotizaciones => ({
   id: uid(),
   numero: numeroPara(cotizaciones, hoy()),
@@ -83,10 +87,40 @@ export const cotizacionVacia = cotizaciones => ({
   estado: "Pendiente",
   condicionesPago: CONDICIONES_PAGO[0],
   garantia: GARANTIAS[0],
-  nota: NOTAS_FRECUENTES[0],
+  notas: [NOTAS_FRECUENTES[0]],
   items: [],
   total: 0,
 });
+
+/** Notas del presupuesto: tantas como haga falta, de la lista o escritas. */
+function Notas({ notas, onCambio }) {
+  const [texto, setTexto] = useState("");
+
+  const agregar = t => { const v = t.trim(); if (v && !notas.includes(v)) onCambio([...notas, v]); };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <Etiqueta>Notas {notas.length > 0 && `(${notas.length})`}</Etiqueta>
+
+      {notas.map((n, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, background: BG_INPUT, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "9px 12px", marginBottom: 6 }}>
+          <span style={{ flex: 1, fontSize: 13 }}>{n}</span>
+          <button onClick={() => onCambio(notas.filter((_, j) => j !== i))}
+            style={{ background: "none", border: "none", color: RED, cursor: "pointer", fontSize: 15, padding: 0, lineHeight: 1 }}>✕</button>
+        </div>
+      ))}
+
+      <select value="" onChange={e => { agregar(e.target.value); e.target.value = ""; }} style={{ ...estiloInput, marginBottom: 8 }}>
+        <option value="">➕ Añadir nota frecuente…</option>
+        {NOTAS_FRECUENTES.filter(n => !notas.includes(n)).map(n => <option key={n} value={n}>{n}</option>)}
+      </select>
+
+      <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2} placeholder="…o escribe una nota nueva"
+        style={{ ...estiloInput, resize: "vertical", marginBottom: 8 }} />
+      <Btn onClick={() => { agregar(texto); setTexto(""); }} color={ac} outline small disabled={!texto.trim()}>+ Añadir nota</Btn>
+    </div>
+  );
+}
 
 /** Desplegable con opciones frecuentes que además admite escribir a mano. */
 function SelLibre({ label, value, onChange, opciones, placeholder }) {
@@ -279,7 +313,9 @@ function HojaImpresion({ cotizacion, cliente, empresa }) {
       <div style={{ fontSize: 11.5, marginTop: 12, lineHeight: 1.7 }}>
         <div style={{ fontWeight: 700 }}>PRECIO EN DÓLAR AMERICANO (US$)</div>
         {cotizacion.garantia && <div><b>GARANTÍA:</b> {cotizacion.garantia}</div>}
-        {cotizacion.nota && <div><b>NOTA:</b> {cotizacion.nota}</div>}
+        {notasDe(cotizacion).map((n, i) => (
+          <div key={i}>{i === 0 ? <b>NOTA: </b> : <span style={{ paddingLeft: 44 }} />}{n}</div>
+        ))}
       </div>
 
       <div style={{ textAlign: "center", fontSize: 10, marginTop: 26, borderTop: "1px solid #000", paddingTop: 8, lineHeight: 1.6 }}>
@@ -292,7 +328,7 @@ function HojaImpresion({ cotizacion, cliente, empresa }) {
 }
 
 // ── MÓDULO ────────────────────────────────────────────────────────────────────
-export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, setClientes, inventario, repuestos, empresa, onAprobar }) {
+export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, setClientes, inventario, repuestos, empresa, onAprobar, onEditarAprobada }) {
   const [modal, setModal] = useState(false);
   const [detalle, setDetalle] = useState(null);
   const [form, setForm] = useState(null);
@@ -325,6 +361,10 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
   const guardar = () => {
     if (!form.clienteId || form.items.length === 0) return;
     setCotizaciones(p => p.find(x => x.id === form.id) ? p.map(x => x.id === form.id ? form : x) : [...p, form]);
+    // Si ya generó tarea, esta arrastra el nuevo alcance. Normalmente ocurre
+    // antes de publicarla a los técnicos, pero si ya estuviera publicada el
+    // cambio queda anotado en su historial igualmente.
+    if (form.estado === "Aprobada") onEditarAprobada?.(form);
     setModal(false);
   };
 
@@ -358,8 +398,18 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
               <Btn onClick={() => setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Rechazada" } : x))} color={RED} outline small>✗</Btn>
             </div>
           )}
+          {/* Una cotización aprobada se sigue pudiendo modificar: el cliente
+              puede cambiar de equipo antes de que empiece el trabajo. */}
           {q.estado === "Aprobada" && (
-            <p style={{ margin: "6px 0 0", fontSize: 12, color: TEXT_SUB }}>✓ Aprobada · se generó una tarea en 📅 Tareas</p>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB, flex: 1 }}>✓ Aprobada · generó una tarea en 📅 Tareas</p>
+              <Btn onClick={() => abrirEdicion(q)} color={ac} outline small>✏️ Modificar</Btn>
+            </div>
+          )}
+          {q.estado === "Rechazada" && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn onClick={() => setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Pendiente" } : x))} color={ac} outline small>↺ Volver a pendiente</Btn>
+            </div>
           )}
         </Card>
       ))}
@@ -394,7 +444,10 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
           </div>
 
           {detalle.garantia && <p style={{ margin: "0 0 6px", fontSize: 13 }}><b>Garantía:</b> {detalle.garantia}</p>}
-          {detalle.nota && <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}><b>Nota:</b> {detalle.nota}</p>}
+          {notasDe(detalle).map((n, i) => (
+            <p key={i} style={{ margin: "0 0 4px", fontSize: 13, color: TEXT_SUB }}>{i === 0 ? <b>Notas: </b> : null}{n}</p>
+          ))}
+          <div style={{ height: 12 }} />
 
           <div style={{ display: "flex", gap: 10 }}>
             <Btn onClick={() => setImprimiendo(detalle)} color={ac} full>🖨️ Generar PDF</Btn>
@@ -414,6 +467,12 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
       {modal && form && (
         <Modal onClose={() => setModal(false)}>
           <h3 style={{ margin: "0 0 16px", color: ac }}>Presupuesto</h3>
+
+          {form.estado === "Aprobada" && (
+            <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#856404", fontWeight: 600 }}>
+              ⚠️ Esta cotización ya generó una tarea. Al guardar, la tarea recogerá el nuevo alcance y quedará anotado en su historial.
+            </div>
+          )}
 
           {/* El número sale de la fecha, así que cambiar la fecha lo recalcula. */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 10 }}>
@@ -450,8 +509,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
 
           <SelLibre label="Garantía" value={form.garantia} onChange={v => set("garantia", v)}
             opciones={GARANTIAS} placeholder="Escribe la garantía" />
-          <SelLibre label="Nota" value={form.nota} onChange={v => set("nota", v)}
-            opciones={NOTAS_FRECUENTES} placeholder="Escribe una nota" />
+          <Notas notas={notasDe(form)} onCambio={v => set("notas", v)} />
 
           <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 18, margin: "8px 0 16px", padding: "10px 0", borderTop: `2px solid ${ac}` }}>
             <span>TOTAL US</span><span style={{ color: ac }}>{usd(form.total)}</span>

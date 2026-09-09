@@ -504,27 +504,46 @@ export default function App() {
     setGarantias(GARANTIAS_DEMO); setTecnicos(TECNICOS_DEMO);
   };
 
+  // Lo que la tarea hereda del presupuesto. Se calcula aparte porque se usa al
+  // aprobar y también cada vez que la cotización se modifica después.
+  const alcanceDeCotizacion = q => ({
+    // El equipo es la primera línea que corresponda a algo del inventario; si
+    // no hay ninguna, la primera línea del presupuesto.
+    modelo: (q.items.find(i => inventario.some(m => m.nombre === i.nombre)) || q.items[0])?.nombre || "",
+    descripcion: q.items.map(i => `• ${i.cantidad > 1 ? `${i.cantidad} × ` : ""}${i.nombre}${i.detalle ? ` (${i.detalle})` : ""}`).join("\n"),
+    costo: q.total,
+  });
+
   // Aprobar una cotización crea la tarea de instalación correspondiente. Nace
-  // sin técnico y sin publicar: la oficina la agenda, la asigna y decide
-  // cuándo se la enseña al técnico.
+  // sin publicar: la oficina la agenda y decide cuándo se la enseña al técnico.
   const aprobarCotizacion = q => {
     setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Aprobada" } : x));
-    // El equipo de la tarea es la primera línea que corresponda a algo del
-    // inventario; si no hay ninguna, la primera línea del presupuesto.
-    const planta = q.items.find(i => inventario.some(m => m.nombre === i.nombre)) || q.items[0];
     setTareas(p => [...p, {
       ...tareaVacia(q.clienteId),
       tipo: "Instalación",
-      modelo: planta?.nombre || "",
       direccion: clientes.find(c => c.id === q.clienteId)?.direccion || "",
-      descripcion: q.items.map(i => `• ${i.cantidad > 1 ? `${i.cantidad} × ` : ""}${i.nombre}${i.detalle ? ` (${i.detalle})` : ""}`).join("\n"),
-      costo: q.total,
       duracionDias: 2,
       cotizacionId: q.id,
-      historial: [{ accion: "Creada desde cotización aprobada", quien: "Oficina", cuando: new Date().toISOString() }],
+      ...alcanceDeCotizacion(q),
+      historial: [{ accion: `Creada desde la cotización Nº ${q.numero}`, quien: "Oficina", cuando: new Date().toISOString() }],
     }]);
     setTab("tareas");
   };
+
+  // Si el cliente cambia de idea y se modifica un presupuesto ya aprobado, la
+  // tarea tiene que reflejarlo: el técnico va a la calle con ese alcance. El
+  // cambio queda anotado en su historial para que no pase desapercibido.
+  const actualizarTareaDeCotizacion = q => setTareas(p => p.map(t => {
+    if (t.cotizacionId !== q.id) return t;
+    const alcance = alcanceDeCotizacion(q);
+    const sinCambios = t.modelo === alcance.modelo && t.descripcion === alcance.descripcion && t.costo === alcance.costo;
+    if (sinCambios) return t;
+    return {
+      ...t,
+      ...alcance,
+      historial: [...(t.historial || []), { accion: `Alcance actualizado desde la cotización Nº ${q.numero}`, quien: "Oficina", cuando: new Date().toISOString() }],
+    };
+  }));
 
   const restaurarDatos = d => {
     if (Array.isArray(d.clientes))     setClientes(d.clientes);
@@ -611,7 +630,7 @@ export default function App() {
         {tab === "inicio"       && <ModuloBienvenida setTab={setTab} stats={stats} />}
         {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} tecnicos={tecnicos} sesion={sesion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
-        {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} />}
+        {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion} />}
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
