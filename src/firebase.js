@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 // Proyecto propio de VICFAN, separado del de Don Pepe a propósito: cuota,
@@ -17,7 +17,10 @@ const firebaseConfig = {
   appId: "1:550959750572:web:c69e07ff1127e1ac552e09"
 };
 
-const app = initializeApp(firebaseConfig);
+// Reutiliza la app si ya existe. Al recargar en caliente durante el desarrollo
+// este módulo se vuelve a ejecutar, y llamar dos veces a initializeApp lanza
+// "app/duplicate-app" y rompe la recarga.
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 // Caché persistente: con datos móviles inestables (el caso de los técnicos en
 // Venezuela) Firestore sigue leyendo y escribiendo sin conexión, y encola los
