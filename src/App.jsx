@@ -5,7 +5,7 @@ import {
   ACENTOS, ESTADO_COLOR, hoy, dn, usd, uid, cargarLS,
   Badge, Btn, Card, Inp, Sel, Modal, estiloInput,
 } from "./ui.jsx";
-import ModuloTareas from "./modules/Tareas.jsx";
+import ModuloTareas, { tareaVacia } from "./modules/Tareas.jsx";
 import PantallaLogin, { PIN_ADMIN_POR_DEFECTO } from "./sesion.jsx";
 
 const TABS = [
@@ -156,7 +156,7 @@ const SERVICIOS_CATALOGO = [
   { id: "sv_otro",   nombre: "Otro servicio",                    precio: 0,   tipo: "libre" },
 ];
 
-function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, inventario }) {
+function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, inventario, onAprobar }) {
   const [modal, setModal] = useState(false);
   const [detalle, setDetalle] = useState(null);
   const [form, setForm] = useState({});
@@ -216,9 +216,14 @@ function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, inventari
           </div>
           {q.estado === "Pendiente" && (
             <div style={{ display: "flex", gap: 8 }}>
-              <Btn onClick={() => setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Aprobada" } : x))} color={GREEN} small full>✓ Aprobar</Btn>
+              <Btn onClick={() => onAprobar(q)} color={GREEN} small full>✓ Aprobar y crear tarea</Btn>
               <Btn onClick={() => setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Rechazada" } : x))} color={RED} outline small full>✗ Rechazar</Btn>
             </div>
+          )}
+          {q.estado === "Aprobada" && (
+            <p style={{ margin: "6px 0 0", fontSize: 12, color: TEXT_SUB }}>
+              ✓ Aprobada · se generó una tarea en 📅 Tareas
+            </p>
           )}
         </Card>
       ))}
@@ -638,6 +643,26 @@ export default function App() {
     setGarantias(GARANTIAS_DEMO); setTecnicos(TECNICOS_DEMO);
   };
 
+  // Aprobar una cotización crea la tarea de instalación correspondiente. Nace
+  // sin técnico y sin publicar: la oficina la agenda, la asigna y decide
+  // cuándo se la enseña al técnico.
+  const aprobarCotizacion = q => {
+    setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Aprobada" } : x));
+    const planta = q.items.find(i => i.tipo === "planta");
+    setTareas(p => [...p, {
+      ...tareaVacia(q.clienteId, ""),
+      tipo: "Instalación",
+      modelo: planta?.nombre || "",
+      direccion: clientes.find(c => c.id === q.clienteId)?.direccion || "",
+      descripcion: q.items.map(i => `• ${i.nombre}${i.detalle ? ` (${i.detalle})` : ""}`).join("\n"),
+      costo: q.total,
+      duracionMin: 240,
+      cotizacionId: q.id,
+      historial: [{ accion: "Creada desde cotización aprobada", quien: "Oficina", cuando: new Date().toISOString() }],
+    }]);
+    setTab("tareas");
+  };
+
   const restaurarDatos = d => {
     if (Array.isArray(d.clientes))     setClientes(d.clientes);
     if (Array.isArray(d.cotizaciones)) setCotizaciones(d.cotizaciones);
@@ -715,7 +740,7 @@ export default function App() {
         {tab === "inicio"       && <ModuloBienvenida setTab={setTab} stats={stats} />}
         {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} tecnicos={tecnicos} sesion={sesion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
-        {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} inventario={inventario} />}
+        {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} inventario={inventario} onAprobar={aprobarCotizacion} />}
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
