@@ -3,8 +3,9 @@ import { useColeccion } from "./datos.js";
 import {
   NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB,
   ACENTOS, ESTADO_COLOR, hoy, dn, usd, uid, cargarLS,
-  Badge, Btn, Card, Inp, Sel, Modal,
+  Badge, Btn, Card, Inp, Sel, Modal, CampoImagen,
 } from "./ui.jsx";
+import { prepararImagen, prepararLogo } from "./imagenes.js";
 import ModuloTareas, { tareaVacia } from "./modules/Tareas.jsx";
 import ModuloCotizaciones, { EMPRESA_POR_DEFECTO } from "./modules/Cotizaciones.jsx";
 import PantallaLogin, { PIN_ADMIN_POR_DEFECTO } from "./sesion.jsx";
@@ -202,7 +203,8 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }
       </div>
       {lista.map(item => (
         <Card key={item.id}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+            {item.imagen && <img src={item.imagen} alt="" style={{ width: 56, height: 56, objectFit: "contain", borderRadius: 8, border: `1px solid ${BORDER}` }} />}
             <div style={{ flex: 1 }}>
               <p style={{ margin: "0 0 2px", fontWeight: 700, fontSize: 15 }}>{item.nombre}</p>
               {item.potencia && <p style={{ margin: "0 0 2px", fontSize: 13, color: TEXT_SUB }}>⚡ {item.potencia} · {item.combustible}</p>}
@@ -225,6 +227,9 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }
           <Inp label="Código" value={form.codigo || ""} onChange={v => setForm(f => ({ ...f, codigo: v }))} />
           <Inp label="Nombre" value={form.nombre || ""} onChange={v => setForm(f => ({ ...f, nombre: v }))} />
           {sub === "modelos" && <>
+            <CampoImagen label="Foto del equipo" valor={form.imagen} preparar={prepararImagen}
+              onCambio={v => setForm(f => ({ ...f, imagen: v }))}
+              ayuda="Aparece junto a esta planta en los presupuestos impresos." />
             <Inp label="Potencia" value={form.potencia || ""} onChange={v => setForm(f => ({ ...f, potencia: v }))} placeholder="5500W" />
             <Sel label="Combustible" value={form.combustible || "Gasolina"} onChange={v => setForm(f => ({ ...f, combustible: v }))} options={["Gasolina", "Gas/Propano", "Diésel", "Dual"].map(t => ({ value: t, label: t }))} />
           </>}
@@ -366,6 +371,9 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, car
             <Inp label="Teléfonos" value={borradorEmpresa.telefonos || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, telefonos: v }))} />
             <Inp label="Email" value={borradorEmpresa.email || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, email: v }))} />
             <Inp label="Web" value={borradorEmpresa.web || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, web: v }))} />
+            <CampoImagen label="Logo" valor={borradorEmpresa.logo} preparar={prepararLogo} alto={70}
+              onCambio={v => setBorradorEmpresa(p => ({ ...p, logo: v }))}
+              ayuda="Sale en la cabecera de cada presupuesto impreso." />
             <div style={{ display: "flex", gap: 8 }}>
               <Btn onClick={() => { setEmpresa({ ...borradorEmpresa, id: "datos" }); setEditandoEmpresa(false); }} color={ac} small full>Guardar</Btn>
               <Btn onClick={() => setEditandoEmpresa(false)} color={TEXT_SUB} outline small full>Cancelar</Btn>

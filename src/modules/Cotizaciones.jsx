@@ -253,16 +253,23 @@ function LineasItems({ items, onCambio, inventario, repuestos }) {
 // Se genera el PDF con la impresión del propio navegador en lugar de una
 // librería: el texto sale seleccionable, no añade peso a la app, y en el móvil
 // el sistema ofrece "Guardar como PDF" para enviarlo por WhatsApp.
-function HojaImpresion({ cotizacion, cliente, empresa }) {
+function HojaImpresion({ cotizacion, cliente, empresa, inventario = [] }) {
   if (!cotizacion) return null;
   const e = empresa || EMPRESA_POR_DEFECTO;
 
+  // La foto se busca en el inventario al imprimir en vez de copiarla dentro de
+  // cada cotización: así una imagen no se duplica en decenas de presupuestos.
+  const fotoDe = nombre => inventario.find(m => m.nombre === nombre)?.imagen || null;
+
   return (
     <div className="hoja-impresion">
-      <div style={{ textAlign: "center", borderBottom: "2px solid #000", paddingBottom: 8, marginBottom: 14 }}>
-        <div style={{ fontSize: 17, fontWeight: 800 }}>{e.nombre}</div>
-        <div style={{ fontSize: 11 }}>{e.rif}</div>
-        {e.eslogan && <div style={{ fontSize: 11, fontStyle: "italic" }}>{e.eslogan}</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, borderBottom: "2px solid #000", paddingBottom: 8, marginBottom: 14 }}>
+        {e.logo && <img src={e.logo} alt="" style={{ height: 58, maxWidth: 150, objectFit: "contain" }} />}
+        <div style={{ flex: 1, textAlign: e.logo ? "left" : "center" }}>
+          <div style={{ fontSize: 17, fontWeight: 800 }}>{e.nombre}</div>
+          <div style={{ fontSize: 11 }}>{e.rif}</div>
+          {e.eslogan && <div style={{ fontSize: 11, fontStyle: "italic" }}>{e.eslogan}</div>}
+        </div>
       </div>
 
       <div style={{ textAlign: "center", fontSize: 15, fontWeight: 800, marginBottom: 12 }}>
@@ -291,8 +298,15 @@ function HojaImpresion({ cotizacion, cliente, empresa }) {
           {cotizacion.items.map(it => (
             <tr key={it.id}>
               <td style={{ border: "1px solid #000", padding: "5px 6px" }}>
-                {it.nombre}
-                {it.detalle && <div style={{ fontSize: 10.5 }}>{it.detalle}</div>}
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  {fotoDe(it.nombre) && (
+                    <img src={fotoDe(it.nombre)} alt="" style={{ width: 68, height: 68, objectFit: "contain", flexShrink: 0 }} />
+                  )}
+                  <div>
+                    {it.nombre}
+                    {it.detalle && <div style={{ fontSize: 10.5 }}>{it.detalle}</div>}
+                  </div>
+                </div>
               </td>
               <td style={{ border: "1px solid #000", padding: "5px 6px", textAlign: "center" }}>{it.cantidad}</td>
               <td style={{ border: "1px solid #000", padding: "5px 6px", textAlign: "right" }}>{usd(it.precio)}</td>
@@ -460,7 +474,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
       )}
 
       {imprimiendo && (
-        <HojaImpresion cotizacion={imprimiendo} cliente={cli(imprimiendo.clienteId)} empresa={empresa} />
+        <HojaImpresion cotizacion={imprimiendo} cliente={cli(imprimiendo.clienteId)} empresa={empresa} inventario={inventario} />
       )}
 
       {/* ── Formulario ── */}

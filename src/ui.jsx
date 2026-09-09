@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 // ── PALETA ────────────────────────────────────────────────────────────────────
 export const NAVY      = "#0d1b2e";
 export const ORANGE    = "#f26522";
@@ -122,6 +124,46 @@ export function Modal({ children, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()}>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Campo para subir una imagen que se guarda dentro del registro.
+ * @param preparar función que comprime el archivo y devuelve { dataUrl, bytes }
+ */
+export function CampoImagen({ label, valor, onCambio, preparar, ayuda, alto = 90 }) {
+  const [cargando, setCargando] = useState(false);
+
+  const elegir = async e => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setCargando(true);
+    try {
+      const { dataUrl } = await preparar(file);
+      onCambio(dataUrl);
+    } catch {
+      alert("No se pudo procesar la imagen. Prueba con otra.");
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      {label && <Etiqueta>{label}</Etiqueta>}
+      {valor && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <img src={valor} alt="" style={{ height: alto, maxWidth: "60%", objectFit: "contain", background: BG_INPUT, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 4 }} />
+          <button onClick={() => onCambio(null)} style={{ background: "none", border: "none", color: RED, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Quitar</button>
+        </div>
+      )}
+      <label style={{ display: "block", background: BG_INPUT, border: `1.5px dashed ${BORDER}`, borderRadius: 12, padding: "12px", textAlign: "center", cursor: "pointer", color: TEXT_SUB, fontSize: 13, fontWeight: 600 }}>
+        {cargando ? "Procesando…" : valor ? "🖼️ Cambiar imagen" : "🖼️ Subir imagen"}
+        <input type="file" accept="image/*" onChange={elegir} disabled={cargando} style={{ display: "none" }} />
+      </label>
+      {ayuda && <p style={{ margin: "6px 0 0", fontSize: 11, color: TEXT_SUB }}>{ayuda}</p>}
     </div>
   );
 }
