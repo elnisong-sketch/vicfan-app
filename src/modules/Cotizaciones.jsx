@@ -177,7 +177,9 @@ function LineasItems({ items, onCambio, inventario, repuestos }) {
     const [origen, indice] = valor.split(":");
     let base = { nombre: "", detalle: "", precio: 0 };
 
-    if (origen === "planta")    { const m = inventario[indice]; base = { nombre: m.nombre, detalle: m.potencia ? `${m.potencia} · ${m.combustible}` : "", precio: m.precio }; }
+    // Se guarda el id del modelo, no solo su nombre: así la foto sigue
+    // encontrándose aunque después se renombre el equipo en el inventario.
+    if (origen === "planta")    { const m = inventario[indice]; base = { modeloId: m.id, nombre: m.nombre, detalle: m.potencia ? `${m.potencia} · ${m.combustible}` : "", precio: m.precio }; }
     if (origen === "repuesto")  { const r = repuestos[indice];  base = { nombre: r.nombre, detalle: "", precio: r.precio }; }
     if (origen === "servicio")  { const s = SERVICIOS_CATALOGO[indice]; base = { nombre: s.nombre, detalle: s.detalle, precio: s.precio }; }
     if (origen === "libre")     { base = { nombre: "", detalle: "", precio: 0 }; }
@@ -259,7 +261,14 @@ function HojaImpresion({ cotizacion, cliente, empresa, inventario = [] }) {
 
   // La foto se busca en el inventario al imprimir en vez de copiarla dentro de
   // cada cotización: así una imagen no se duplica en decenas de presupuestos.
-  const fotoDe = nombre => inventario.find(m => m.nombre === nombre)?.imagen || null;
+  // Primero por id del modelo, y si la línea es antigua o se escribió a mano,
+  // por nombre sin distinguir mayúsculas ni espacios de sobra.
+  const normalizar = t => (t || "").trim().toLowerCase();
+  const fotoDe = item => {
+    const porId = item.modeloId && inventario.find(m => m.id === item.modeloId);
+    if (porId?.imagen) return porId.imagen;
+    return inventario.find(m => normalizar(m.nombre) === normalizar(item.nombre))?.imagen || null;
+  };
 
   return (
     <div className="hoja-impresion">
@@ -299,8 +308,8 @@ function HojaImpresion({ cotizacion, cliente, empresa, inventario = [] }) {
             <tr key={it.id}>
               <td style={{ border: "1px solid #000", padding: "5px 6px" }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  {fotoDe(it.nombre) && (
-                    <img src={fotoDe(it.nombre)} alt="" style={{ width: 68, height: 68, objectFit: "contain", flexShrink: 0 }} />
+                  {fotoDe(it) && (
+                    <img src={fotoDe(it)} alt="" style={{ width: 68, height: 68, objectFit: "contain", flexShrink: 0 }} />
                   )}
                   <div>
                     {it.nombre}

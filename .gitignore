@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Imágenes originales del logo y el catálogo: viven en Firestore, no en el repo
+/logo.png
+/Standby Generator*.png
+.imagenes.tmp.json
