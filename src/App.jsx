@@ -7,6 +7,7 @@ import {
 } from "./ui.jsx";
 import ModuloTareas, { tareaVacia } from "./modules/Tareas.jsx";
 import PantallaLogin, { PIN_ADMIN_POR_DEFECTO } from "./sesion.jsx";
+import { useNuevaVersion } from "./version.js";
 
 const TABS = [
   { id: "tareas",       icon: "📅", label: "Tareas" },
@@ -75,7 +76,7 @@ const normalizarEstado = e => (e === "Completado" ? "Completada" : e || "Program
 
 const desdeInstalacion = i => ({
   id: i.id, tipo: "Instalación", clienteId: i.clienteId, tecnicoId: i.tecnicoId || "",
-  fecha: i.fechaProgramada || hoy(), hora: "09:00", duracionMin: 120,
+  fecha: i.fechaProgramada || hoy(), hora: "09:00", duracionDias: 1,
   estado: normalizarEstado(i.estado), prioridad: "Normal",
   modelo: i.modelo || "", direccion: i.direccion || "", descripcion: "",
   costo: 0, notas: i.notas || "", fotos: [], historial: [], cierre: null,
@@ -84,7 +85,7 @@ const desdeInstalacion = i => ({
 
 const desdeServicio = s => ({
   id: s.id, tipo: s.tipo || "Mantenimiento", clienteId: s.clienteId, tecnicoId: s.tecnicoId || "",
-  fecha: s.fecha || hoy(), hora: "09:00", duracionMin: 90,
+  fecha: s.fecha || hoy(), hora: "09:00", duracionDias: 1,
   estado: normalizarEstado(s.estado), prioridad: "Normal",
   modelo: s.modelo || "", direccion: "", descripcion: s.descripcion || "",
   costo: s.costo || 0, notas: "", fotos: [], historial: [], cierre: null,
@@ -632,6 +633,8 @@ export default function App() {
   const [pinAdmin, setPinAdmin] = useState(() => cargarLS("vf_pin_admin", PIN_ADMIN_POR_DEFECTO));
   const [sesion, setSesion]     = useState(() => cargarLS("vf_sesion", null));
 
+  const hayVersionNueva = useNuevaVersion();
+
   const guardarLocal = (clave, valor) => { try { localStorage.setItem(clave, JSON.stringify(valor)); } catch {} };
   useEffect(() => { guardarLocal("vf_sesion", sesion); }, [JSON.stringify(sesion)]);
   useEffect(() => { guardarLocal("vf_pin_admin", pinAdmin); }, [pinAdmin]);
@@ -656,7 +659,7 @@ export default function App() {
       direccion: clientes.find(c => c.id === q.clienteId)?.direccion || "",
       descripcion: q.items.map(i => `• ${i.nombre}${i.detalle ? ` (${i.detalle})` : ""}`).join("\n"),
       costo: q.total,
-      duracionMin: 240,
+      duracionDias: 2,
       cotizacionId: q.id,
       historial: [{ accion: "Creada desde cotización aprobada", quien: "Oficina", cuando: new Date().toISOString() }],
     }]);
@@ -699,6 +702,13 @@ export default function App() {
   };
 
   const Cabecera = () => (
+    <>
+    {hayVersionNueva && (
+      <button onClick={() => window.location.reload()}
+        style={{ width: "100%", background: ORANGE, border: "none", color: "#fff", padding: "11px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+        ⬆️ Hay una versión nueva · toca aquí para actualizar
+      </button>
+    )}
     <div style={{ background: NAVY, padding: "14px 20px", boxShadow: "0 2px 12px #0003", position: "sticky", top: 0, zIndex: 100 }}>
       <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <button onClick={() => !esTecnico && setTab("inicio")} style={{ background: "none", border: "none", cursor: esTecnico ? "default" : "pointer", padding: 0, textAlign: "left" }}>
@@ -717,6 +727,7 @@ export default function App() {
         </div>
       </div>
     </div>
+    </>
   );
 
   // ── Vista del técnico: solo su día, sin acceso a ventas ni precios ──────────

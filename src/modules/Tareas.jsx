@@ -25,7 +25,7 @@ export const tareaVacia = (clienteId, tecnicoId) => ({
   tecnicoId: tecnicoId || "",
   fecha: hoy(),
   hora: "09:00",
-  duracionMin: 120,
+  duracionDias: 1,
   estado: "Programada",
   prioridad: "Normal",
   // La tarea nace privada: la oficina la prepara, la asigna y la publica
@@ -56,6 +56,11 @@ const estaAtrasada = t => estaAbierta(t) && esPasado(t.fecha);
 // Las tareas anteriores a esta función no tienen el campo, y deben seguir
 // viéndose: solo se oculta lo que se marcó explícitamente como no publicado.
 const estaPublicada = t => t.publicada !== false;
+// Las tareas antiguas guardaban minutos. Una instalación llave en mano se
+// mide en días, no en minutos, así que se muestran días y las viejas cuentan
+// como un día.
+const duracionEnDias = t => t.duracionDias ?? 1;
+const textoDuracion = t => { const d = duracionEnDias(t); return `${d} día${d === 1 ? "" : "s"}`; };
 
 // ── GALERÍA DE FOTOS ──────────────────────────────────────────────────────────
 function Fotos({ tareaId, fotos, onCambio, soloLectura }) {
@@ -143,7 +148,7 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura }) {
 }
 
 // ── TARJETA DE TAREA ──────────────────────────────────────────────────────────
-function TarjetaTarea({ tarea, nombreCliente, nombreTecnico, esTecnico, onAbrir, onIniciar, onCerrar, onFotos, onPublicar, compacta }) {
+function TarjetaTarea({ tarea, nombreCliente, esTecnico, onAbrir, onIniciar, onCerrar, onFotos, onPublicar, compacta }) {
   const atrasada = estaAtrasada(tarea);
   const publicada = estaPublicada(tarea);
   return (
@@ -156,9 +161,9 @@ function TarjetaTarea({ tarea, nombreCliente, nombreTecnico, esTecnico, onAbrir,
           </div>
           <p style={{ margin: "0 0 3px", fontSize: 13, color: TEXT_SUB }}>{tarea.tipo}{tarea.modelo ? ` · ${tarea.modelo}` : ""}</p>
           {tarea.direccion && <p style={{ margin: "0 0 3px", fontSize: 12, color: TEXT_SUB }}>📍 {tarea.direccion}</p>}
-          {/* Solo se nombra al técnico si alguien lo asignó: "Sin asignar" en
-              cada tarjeta sería ruido, porque asignar es opcional. */}
-          {tarea.tecnicoId && <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB }}>👷 {nombreTecnico}</p>}
+          {/* Las tareas son del equipo, no de una persona. Los nombres de los
+              técnicos solo aparecen en el registro de quién cerró o subió qué. */}
+          <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB }}>👷 Técnicos</p>
         </div>
         <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
           <Badge text={tarea.estado} color={ESTADO_COLOR[tarea.estado] || TEXT_SUB} small />
@@ -189,7 +194,7 @@ function TarjetaTarea({ tarea, nombreCliente, nombreTecnico, esTecnico, onAbrir,
 }
 
 // ── MODAL: CREAR / EDITAR ─────────────────────────────────────────────────────
-function ModalTarea({ form, setForm, clientes, tecnicos, onGuardar, onCerrar }) {
+function ModalTarea({ form, setForm, clientes, onGuardar, onCerrar }) {
   const cliente = clientes.find(c => c.id === form.clienteId);
   const set = (campo, v) => setForm(f => ({ ...f, [campo]: v }));
 
@@ -205,14 +210,13 @@ function ModalTarea({ form, setForm, clientes, tecnicos, onGuardar, onCerrar }) 
 
       <Sel label="Tipo de tarea" value={form.tipo} onChange={v => set("tipo", v)} options={TIPOS_TAREA.map(t => ({ value: t, label: `${TIPO_ICONO[t]} ${t}` }))} />
       <Sel label="Cliente" value={form.clienteId} onChange={elegirCliente} options={[{ value: "", label: "— Selecciona —" }, ...clientes.map(c => ({ value: c.id, label: c.nombre }))]} />
-      <Sel label="Técnico asignado" value={form.tecnicoId} onChange={v => set("tecnicoId", v)} options={[{ value: "", label: "— Sin asignar —" }, ...tecnicos.map(t => ({ value: t.id, label: t.nombre }))]} />
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
         <Inp label="Fecha" type="date" value={form.fecha} onChange={v => set("fecha", v)} />
         <Inp label="Hora" type="time" value={form.hora} onChange={v => set("hora", v)} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <Inp label="Duración (min)" type="number" value={String(form.duracionMin)} onChange={v => set("duracionMin", Number(v))} />
+        <Inp label="Duración (días)" type="number" value={String(form.duracionDias ?? 1)} onChange={v => set("duracionDias", Math.max(1, Number(v) || 1))} />
         <Sel label="Prioridad" value={form.prioridad} onChange={v => set("prioridad", v)} options={["Normal", "Alta", "Urgente"].map(p => ({ value: p, label: p }))} />
       </div>
 
@@ -314,7 +318,7 @@ function Observaciones({ notas, onAgregar, quien }) {
 }
 
 // ── MODAL: DETALLE / HISTORIAL ────────────────────────────────────────────────
-function ModalDetalle({ tarea, nombreCliente, nombreTecnico, tecnicos, sesion, onEditar, onReprogramar, onCancelarTarea, onFotos, onObservacion, onReabrir, onPublicar, onAsignar, onCerrar }) {
+function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, onCancelarTarea, onFotos, onObservacion, onReabrir, onPublicar, onCerrar }) {
   const [nuevaFecha, setNuevaFecha] = useState(tarea.fecha);
   const [reprogramando, setReprogramando] = useState(false);
   const [confirmarReapertura, setConfirmarReapertura] = useState(false);
@@ -345,17 +349,11 @@ function ModalDetalle({ tarea, nombreCliente, nombreTecnico, tecnicos, sesion, o
         </div>
       )}
 
-      {/* Asignar sin pasar por el formulario de edición: es lo que más se toca. */}
-      {!esTecnico && estaAbierta(tarea) && (
-        <Sel label="👷 Técnico asignado" value={tarea.tecnicoId || ""} onChange={onAsignar}
-          options={[{ value: "", label: "— Sin asignar —" }, ...tecnicos.map(t => ({ value: t.id, label: t.nombre }))]} />
-      )}
-
       <div style={{ background: BG_INPUT, borderRadius: 12, padding: 14, marginBottom: 16, fontSize: 13, lineHeight: 1.7 }}>
-        {esTecnico && tarea.tecnicoId && <div>👷 <b>Asignada a:</b> {nombreTecnico}</div>}
+        <div>👷 <b>Asignada a:</b> Técnicos</div>
         {tarea.modelo && <div>⚡ <b>Equipo:</b> {tarea.modelo}</div>}
         {tarea.direccion && <div>📍 <b>Dirección:</b> {tarea.direccion}</div>}
-        <div>⏱️ <b>Duración prevista:</b> {tarea.duracionMin} min</div>
+        <div>⏱️ <b>Duración prevista:</b> {textoDuracion(tarea)}</div>
         {/* Los técnicos nunca ven importes. */}
         {!esTecnico && <div>💵 <b>Costo:</b> {usd(c?.costoFinal ?? tarea.costo)}</div>}
       </div>
@@ -499,7 +497,6 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
   const quienActua = sesion?.nombre || "Oficina";
 
   const nombreCliente = id => clientes.find(c => c.id === id)?.nombre || "— sin cliente —";
-  const nombreTecnico = id => tecnicos.find(t => t.id === id)?.nombre || "Sin asignar";
 
   // Los técnicos comparten la misma cartelera: todos ven todas las tareas que
   // la oficina haya publicado, estén asignadas a quien estén. El técnico
@@ -540,12 +537,6 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
     quienActua,
   ));
 
-  const asignar = (t, tecnicoId) => actualizar(t.id, x => registrar(
-    { ...x, tecnicoId },
-    tecnicoId ? `Asignada a ${nombreTecnico(tecnicoId)}` : "Sin técnico asignado",
-    quienActua,
-  ));
-
   const agregarObservacion = (t, texto) => actualizar(t.id, x => ({
     ...x,
     observaciones: [...(x.observaciones || []), { id: uid(), texto, autor: quienActua, cuando: new Date().toISOString() }],
@@ -571,15 +562,14 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
     setForm(null);
   };
 
-  // Si la crea un técnico, queda asignada a él mismo.
   const nueva = () => setForm({
-    ...tareaVacia(clientes[0]?.id, esTecnico ? sesion.tecnicoId : tecnicos[0]?.id),
+    ...tareaVacia(clientes[0]?.id),
     fecha: vista === "semana" ? baseSemana : hoy(),
   });
 
   const tarjeta = t => (
     <TarjetaTarea key={t.id} tarea={t} esTecnico={esTecnico}
-      nombreCliente={nombreCliente(t.clienteId)} nombreTecnico={nombreTecnico(t.tecnicoId)}
+      nombreCliente={nombreCliente(t.clienteId)}
       onAbrir={() => setDetalle(t)} onIniciar={() => iniciar(t)} onCerrar={() => setCerrando(t)}
       onFotos={() => setDetalle(t)} onPublicar={() => publicar(t, true)} />
   );
@@ -648,15 +638,13 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
       )}
 
       {form && (
-        <ModalTarea form={form} setForm={setForm} clientes={clientes} tecnicos={tecnicos}
+        <ModalTarea form={form} setForm={setForm} clientes={clientes}
           onGuardar={guardar} onCerrar={() => setForm(null)} />
       )}
 
       {detalle && !form && !cerrando && (
         <ModalDetalle tarea={tareas.find(t => t.id === detalle.id) || detalle}
-          nombreCliente={nombreCliente(detalle.clienteId)} nombreTecnico={nombreTecnico(detalle.tecnicoId)}
-          tecnicos={tecnicos} sesion={sesion}
-          onAsignar={id => asignar(detalle, id)}
+          nombreCliente={nombreCliente(detalle.clienteId)} sesion={sesion}
           onEditar={() => { setForm({ ...detalle }); setDetalle(null); }}
           onReprogramar={f => reprogramar(detalle, f)}
           onCancelarTarea={() => cancelarTarea(detalle)}
