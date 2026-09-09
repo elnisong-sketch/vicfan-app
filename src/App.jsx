@@ -442,13 +442,33 @@ function ModuloGarantias({ garantias, clientes }) {
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
-function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, cargarDemo, pinAdmin, setPinAdmin }) {
+function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, cargarDemo, pinAdmin, setPinAdmin }) {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({});
   const [confirmDemo, setConfirmDemo] = useState(false);
   const [editandoPin, setEditandoPin] = useState(false);
   const [pinNuevo, setPinNuevo] = useState("");
+  const [copia, setCopia] = useState(null);   // backup leído, a la espera de confirmación
   const ac = ACENTOS.admin;
+
+  // Nunca se restaura a ciegas: primero se lee el archivo y se le enseña al
+  // usuario qué contiene, porque restaurar reemplaza todo lo que hay.
+  const leerCopia = async e => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const datos = JSON.parse(await file.text());
+      const listas = ["clientes", "tareas", "cotizaciones", "ventas", "inventario", "repuestos", "garantias", "tecnicos"];
+      if (!listas.some(k => Array.isArray(datos[k]))) {
+        alert("Ese archivo no parece una copia de seguridad de VICFAN.");
+        return;
+      }
+      setCopia({ datos, resumen: listas.map(k => ({ k, n: (datos[k] || []).length })).filter(x => x.n > 0) });
+    } catch {
+      alert("No se pudo leer el archivo. ¿Seguro que es el .json que exportaste?");
+    }
+  };
   const guardar = () => {
     if (!form.nombre?.trim()) return;
     if (!/^\d{4}$/.test(form.pin || "")) { alert("El PIN debe tener exactamente 4 dígitos."); return; }
@@ -465,6 +485,25 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, cargarDemo, pinAdmi
     <div>
       <h2 style={{ color: ac, margin: "0 0 16px", fontSize: 18, fontWeight: 900 }}>⚙️ Administración</h2>
       <button onClick={exportarDatos} style={{ width: "100%", background: NAVY, border: "none", borderRadius: 12, color: "#fff", padding: "13px", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}>📤 Exportar Backup</button>
+
+      {!copia ? (
+        <label style={{ display: "block", width: "100%", background: BG_CARD, border: `1.5px solid ${BORDER}`, borderRadius: 12, color: TEXT_MAIN, padding: "13px", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 8, textAlign: "center" }}>
+          📥 Restaurar Backup
+          <input type="file" accept="application/json,.json" onChange={leerCopia} style={{ display: "none" }} />
+        </label>
+      ) : (
+        <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 12, padding: 14, marginBottom: 8 }}>
+          <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 700, color: "#856404" }}>⚠️ Esta copia reemplazará todos los datos actuales:</p>
+          <p style={{ margin: "0 0 4px", fontSize: 13, color: "#856404" }}>
+            {copia.resumen.map(x => `${x.n} ${x.k}`).join(" · ")}
+          </p>
+          <p style={{ margin: "0 0 10px", fontSize: 12, color: "#856404" }}>Las fotos no viajan en el backup: se quedan en el dispositivo donde se tomaron.</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn onClick={() => { restaurarDatos(copia.datos); setCopia(null); }} color={ORANGE} full small>Restaurar</Btn>
+            <Btn onClick={() => setCopia(null)} color={TEXT_SUB} outline full small>Cancelar</Btn>
+          </div>
+        </div>
+      )}
       {!confirmDemo ? (
         <button onClick={() => setConfirmDemo(true)} style={{ width: "100%", background: BG_CARD, border: `1px dashed ${BORDER}`, borderRadius: 12, color: TEXT_SUB, padding: "11px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 20 }}>🧪 Cargar datos de prueba</button>
       ) : (
@@ -629,6 +668,18 @@ export default function App() {
     setGarantias(GARANTIAS_DEMO); setTecnicos(TECNICOS_DEMO);
   };
 
+  const restaurarDatos = d => {
+    if (Array.isArray(d.clientes))     setClientes(d.clientes);
+    if (Array.isArray(d.cotizaciones)) setCotizaciones(d.cotizaciones);
+    if (Array.isArray(d.ventas))       setVentas(d.ventas);
+    if (Array.isArray(d.tareas))       setTareas(d.tareas);
+    if (Array.isArray(d.inventario))   setInventario(d.inventario);
+    if (Array.isArray(d.repuestos))    setRepuestos(d.repuestos);
+    if (Array.isArray(d.garantias))    setGarantias(d.garantias);
+    if (Array.isArray(d.tecnicos))     setTecnicos(d.tecnicos);
+    setTab("inicio");
+  };
+
   const exportarDatos = () => {
     const datos = { clientes, cotizaciones, ventas, tareas, inventario, repuestos, garantias, tecnicos, exportado: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" });
@@ -698,7 +749,7 @@ export default function App() {
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
-        {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} cargarDemo={cargarDemo} pinAdmin={pinAdmin} setPinAdmin={setPinAdmin} />}
+        {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos} cargarDemo={cargarDemo} pinAdmin={pinAdmin} setPinAdmin={setPinAdmin} />}
       </div>
 
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: NAVY, zIndex: 50, boxShadow: "0 -2px 12px #0003" }}>
