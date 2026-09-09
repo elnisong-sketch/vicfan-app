@@ -186,7 +186,7 @@ function TarjetaTarea({ tarea, nombreCliente, esTecnico, onAbrir, onIniciar, onC
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           <Btn onClick={onFotos} color={ACENTOS.tareas} outline small>📷</Btn>
           {tarea.estado === "Programada" && <Btn onClick={onIniciar} color={ORANGE} small full>▶ Iniciar</Btn>}
-          <Btn onClick={onCerrar} color={GREEN} small full>✓ Cerrar</Btn>
+          <Btn onClick={onCerrar} color={GREEN} small full>✓ Finalizar tarea</Btn>
         </div>
       )}
     </Card>
@@ -258,7 +258,7 @@ function ModalCierre({ tarea, tecnicos, sesion, onFotos, onConfirmar, onCancelar
 
   return (
     <Modal onClose={onCancelar}>
-      <h3 style={{ margin: "0 0 4px", color: GREEN }}>✓ Cerrar tarea</h3>
+      <h3 style={{ margin: "0 0 4px", color: GREEN }}>✓ Finalizar tarea</h3>
       <p style={{ margin: "0 0 18px", fontSize: 13, color: TEXT_SUB }}>{tarea.tipo} · {fechaCorta(tarea.fecha)}</p>
 
       {esTecnico ? (
@@ -279,11 +279,11 @@ function ModalCierre({ tarea, tecnicos, sesion, onFotos, onConfirmar, onCancelar
       {!esTecnico && <Inp label="Costo final ($)" type="number" value={costoFinal} onChange={setCostoFinal} />}
 
       <div style={{ background: BG_INPUT, borderRadius: 10, padding: "10px 12px", marginBottom: 14, fontSize: 12, color: TEXT_SUB }}>
-        Se registrará automáticamente la fecha y hora del cierre junto con el nombre de quien lo realizó.
+        Se registrará automáticamente la fecha y hora junto con el nombre de quien realizó el trabajo.
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <Btn onClick={confirmar} color={GREEN} full disabled={!quien || !trabajo.trim()}>Confirmar cierre</Btn>
+        <Btn onClick={confirmar} color={GREEN} full disabled={!quien || !trabajo.trim()}>Confirmar finalización</Btn>
         <Btn onClick={onCancelar} color={TEXT_SUB} outline full>Cancelar</Btn>
       </div>
     </Modal>
@@ -367,7 +367,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
 
       {c && (
         <div style={{ background: GREEN + "11", border: `1px solid ${GREEN}44`, borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <p style={{ margin: "0 0 8px", fontWeight: 800, color: GREEN, fontSize: 13 }}>✓ CERRADA</p>
+          <p style={{ margin: "0 0 8px", fontWeight: 800, color: GREEN, fontSize: 13 }}>✓ FINALIZADA</p>
           <p style={{ margin: "0 0 6px", fontSize: 13 }}><b>Por:</b> {c.tecnicoNombre}</p>
           <p style={{ margin: "0 0 8px", fontSize: 13 }}><b>Cuándo:</b> {horaLegible(c.cerradaEn)}</p>
           <p style={{ margin: 0, fontSize: 14 }}>{c.trabajoRealizado}</p>
@@ -385,7 +385,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
 
       {tarea.cierresPrevios?.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <Etiqueta>Cierres anteriores</Etiqueta>
+          <Etiqueta>Finalizaciones anteriores</Etiqueta>
           {tarea.cierresPrevios.map((p, i) => (
             <div key={i} style={{ background: BG_INPUT, borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
               <p style={{ margin: "0 0 4px", fontSize: 13 }}>{p.trabajoRealizado}</p>
@@ -418,7 +418,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
       ) : confirmarReapertura ? (
         <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 12, padding: 14, marginBottom: 12 }}>
           <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#856404" }}>
-            La tarea volverá a estar programada. El cierre actual y sus fotos se conservan como registro.
+            La tarea volverá a estar programada. Lo ya registrado y sus fotos se conservan como historial.
           </p>
           <div style={{ display: "flex", gap: 8 }}>
             <Btn onClick={() => { onReabrir(); setConfirmarReapertura(false); }} color={ORANGE} full small>Reabrir</Btn>
@@ -515,7 +515,7 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
   const iniciar = t => actualizar(t.id, x => registrar({ ...x, estado: "En proceso" }, "Iniciada", quienActua));
 
   const confirmarCierre = cierre => {
-    actualizar(cerrando.id, x => registrar({ ...x, estado: "Completada", cierre }, "Cerrada", cierre.tecnicoNombre));
+    actualizar(cerrando.id, x => registrar({ ...x, estado: "Completada", cierre }, "Finalizada", cierre.tecnicoNombre));
     setCerrando(null);
     setDetalle(null);
   };
