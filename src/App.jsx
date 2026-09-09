@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useColeccion } from "./datos.js";
 import {
-  NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BG_INPUT, BORDER, TEXT_MAIN, TEXT_SUB,
+  NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB,
   ACENTOS, ESTADO_COLOR, hoy, dn, usd, uid, cargarLS,
-  Badge, Btn, Card, Inp, Sel, Modal, estiloInput,
+  Badge, Btn, Card, Inp, Sel, Modal,
 } from "./ui.jsx";
 import ModuloTareas, { tareaVacia } from "./modules/Tareas.jsx";
+import ModuloCotizaciones, { EMPRESA_POR_DEFECTO } from "./modules/Cotizaciones.jsx";
 import PantallaLogin, { PIN_ADMIN_POR_DEFECTO } from "./sesion.jsx";
 import { useNuevaVersion } from "./version.js";
 
@@ -112,7 +113,7 @@ function ModuloClientes({ clientes, setClientes }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>👥 Clientes</h2>
-        <Btn onClick={() => { setForm({ id: uid(), nombre: "", telefono: "", email: "", direccion: "", tipo: "Residencial", notas: "" }); setModal(true); }} color={ac} small>+ Nuevo</Btn>
+        <Btn onClick={() => { setForm({ id: uid(), nombre: "", documento: "", telefono: "", email: "", direccion: "", tipo: "Residencial", notas: "" }); setModal(true); }} color={ac} small>+ Nuevo</Btn>
       </div>
       <Inp placeholder="Buscar..." value={busqueda} onChange={setBusqueda} />
       {filtrados.map(c => (
@@ -120,6 +121,7 @@ function ModuloClientes({ clientes, setClientes }) {
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <div style={{ flex: 1 }}>
               <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15 }}>{c.nombre}</p>
+              {c.documento && <p style={{ margin: "0 0 2px", fontSize: 13, color: TEXT_SUB }}>🪪 {c.documento}</p>}
               <p style={{ margin: "0 0 2px", fontSize: 13, color: TEXT_SUB }}>📞 {c.telefono}{c.email ? ` · ✉️ ${c.email}` : ""}</p>
               {c.direccion && <p style={{ margin: "0 0 4px", fontSize: 13, color: TEXT_SUB }}>📍 {c.direccion}</p>}
               <Badge text={c.tipo} color={ac} />
@@ -134,192 +136,13 @@ function ModuloClientes({ clientes, setClientes }) {
       {modal && (
         <Modal onClose={() => setModal(false)}>
           <h3 style={{ margin: "0 0 20px", color: ac }}>Cliente</h3>
-          <Inp label="Nombre" value={form.nombre || ""} onChange={v => setForm(p => ({ ...p, nombre: v }))} />
+          <Inp label="Nombre o razón social" value={form.nombre || ""} onChange={v => setForm(p => ({ ...p, nombre: v }))} />
+          <Inp label="C.I. / RIF" value={form.documento || ""} onChange={v => setForm(p => ({ ...p, documento: v }))} placeholder="V-14.930.796" />
           <Inp label="Teléfono" value={form.telefono || ""} onChange={v => setForm(p => ({ ...p, telefono: v }))} placeholder="0412-555-1234" />
           <Inp label="Email" value={form.email || ""} onChange={v => setForm(p => ({ ...p, email: v }))} type="email" />
           <Inp label="Dirección" value={form.direccion || ""} onChange={v => setForm(p => ({ ...p, direccion: v }))} />
           <Sel label="Tipo" value={form.tipo || "Residencial"} onChange={v => setForm(p => ({ ...p, tipo: v }))} options={["Residencial", "Comercial", "Industrial"].map(t => ({ value: t, label: t }))} />
           <div style={{ display: "flex", gap: 10 }}><Btn onClick={guardar} color={ac} full>Guardar</Btn><Btn onClick={() => setModal(false)} color={TEXT_SUB} outline full>Cancelar</Btn></div>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-// ── COTIZACIONES ──────────────────────────────────────────────────────────────
-const SERVICIOS_CATALOGO = [
-  { id: "sv_inst",   nombre: "Instalación eléctrica",            precio: 150, tipo: "fijo" },
-  { id: "sv_cerco",  nombre: "Cerco eléctrico",                  precio: 0,   tipo: "metro" },
-  { id: "sv_cctv",   nombre: "Circuito cerrado (CCTV)",          precio: 0,   tipo: "libre" },
-  { id: "sv_alarma", nombre: "Sistema de alarma",                precio: 0,   tipo: "libre" },
-  { id: "sv_seg",    nombre: "Sistema de seguridad residencial", precio: 0,   tipo: "libre" },
-  { id: "sv_mant",   nombre: "Mantenimiento preventivo",         precio: 80,  tipo: "fijo" },
-  { id: "sv_otro",   nombre: "Otro servicio",                    precio: 0,   tipo: "libre" },
-];
-
-function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, inventario, onAprobar }) {
-  const [modal, setModal] = useState(false);
-  const [detalle, setDetalle] = useState(null);
-  const [form, setForm] = useState({});
-  const [svTipo, setSvTipo] = useState("");
-  const [svMetros, setSvMetros] = useState("");
-  const [svCostoM, setSvCostoM] = useState("");
-  const [svPrecio, setSvPrecio] = useState("");
-  const ac = ACENTOS.cotizaciones;
-
-  const nc = id => clientes.find(c => c.id === id)?.nombre || "—";
-  const calcTotal = items => items.reduce((s, i) => s + (i.subtotal || 0), 0);
-  const recalc = items => setForm(f => ({ ...f, items, total: calcTotal(items) }));
-
-  const agregarPlanta = modeloId => {
-    const m = inventario.find(x => x.id === modeloId); if (!m) return;
-    recalc([...(form.items || []), { id: uid(), tipo: "planta", nombre: m.nombre, cantidad: 1, precio: m.precio, subtotal: m.precio }]);
-  };
-
-  const agregarServicio = () => {
-    const sv = SERVICIOS_CATALOGO.find(s => s.id === svTipo); if (!sv) return;
-    let subtotal = 0, detalle = "";
-    if (sv.tipo === "metro") {
-      const m = Number(svMetros) || 0, c = Number(svCostoM) || 0;
-      subtotal = m * c; detalle = `${m} m × $${c}/m`;
-    } else {
-      subtotal = Number(svPrecio) || sv.precio;
-    }
-    recalc([...(form.items || []), { id: uid(), tipo: "servicio", nombre: sv.nombre, detalle, cantidad: 1, precio: subtotal, subtotal }]);
-    setSvTipo(""); setSvMetros(""); setSvCostoM(""); setSvPrecio("");
-  };
-
-  const eliminarItem = id => recalc((form.items || []).filter(x => x.id !== id));
-
-  const guardar = () => { if (!form.clienteId) return; setCotizaciones(p => p.find(x => x.id === form.id) ? p.map(x => x.id === form.id ? form : x) : [...p, form]); setModal(false); };
-
-  const svSel = SERVICIOS_CATALOGO.find(s => s.id === svTipo);
-  const esCerco = svSel?.tipo === "metro";
-
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>📋 Cotizaciones</h2>
-        <Btn onClick={() => { setForm({ id: uid(), clienteId: clientes[0]?.id || "", fecha: hoy(), estado: "Pendiente", items: [], total: 0, notas: "" }); setSvTipo(""); setSvMetros(""); setSvCostoM(""); setSvPrecio(""); setModal(true); }} color={ac} small>+ Nueva</Btn>
-      </div>
-
-      {cotizaciones.map(q => (
-        <Card key={q.id} style={{ cursor: "pointer" }}>
-          <div onClick={() => setDetalle(q)} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-            <div>
-              <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15 }}>{nc(q.clienteId)}</p>
-              <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB }}>📅 {q.fecha} · {q.items.length} ítem(s)</p>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <p style={{ margin: "0 0 6px", fontWeight: 800, fontSize: 16, color: ac }}>{usd(q.total)}</p>
-              <Badge text={q.estado} color={ESTADO_COLOR[q.estado] || "#888"} />
-            </div>
-          </div>
-          {q.estado === "Pendiente" && (
-            <div style={{ display: "flex", gap: 8 }}>
-              <Btn onClick={() => onAprobar(q)} color={GREEN} small full>✓ Aprobar y crear tarea</Btn>
-              <Btn onClick={() => setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Rechazada" } : x))} color={RED} outline small full>✗ Rechazar</Btn>
-            </div>
-          )}
-          {q.estado === "Aprobada" && (
-            <p style={{ margin: "6px 0 0", fontSize: 12, color: TEXT_SUB }}>
-              ✓ Aprobada · se generó una tarea en 📅 Tareas
-            </p>
-          )}
-        </Card>
-      ))}
-
-      {detalle && (
-        <Modal onClose={() => setDetalle(null)}>
-          <h3 style={{ margin: "0 0 4px", color: ac }}>{nc(detalle.clienteId)}</h3>
-          <p style={{ margin: "0 0 16px", color: TEXT_SUB, fontSize: 13 }}>{detalle.fecha}</p>
-          {detalle.items.map((it, i) => (
-            <div key={i} style={{ padding: "8px 0", borderBottom: `1px solid ${BORDER}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{it.nombre}</span>
-                <span style={{ fontWeight: 700, color: ac }}>{usd(it.subtotal)}</span>
-              </div>
-              {it.detalle && <p style={{ margin: "2px 0 0", fontSize: 12, color: TEXT_SUB }}>{it.detalle}</p>}
-            </div>
-          ))}
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", fontWeight: 800, fontSize: 16 }}>
-            <span>TOTAL</span><span style={{ color: ac }}>{usd(detalle.total)}</span>
-          </div>
-          {detalle.notas && <p style={{ color: TEXT_SUB, fontSize: 13 }}>📝 {detalle.notas}</p>}
-          <Btn onClick={() => setDetalle(null)} color={TEXT_SUB} outline full>Cerrar</Btn>
-        </Modal>
-      )}
-
-      {modal && (
-        <Modal onClose={() => setModal(false)}>
-          <h3 style={{ margin: "0 0 16px", color: ac }}>Nueva Cotización</h3>
-          <Sel label="Cliente" value={form.clienteId || ""} onChange={v => setForm(f => ({ ...f, clienteId: v }))} options={clientes.map(c => ({ value: c.id, label: c.nombre }))} />
-          <Inp label="Fecha" value={form.fecha || hoy()} onChange={v => setForm(f => ({ ...f, fecha: v }))} type="date" />
-
-          <label style={{ fontSize: 12, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 6 }}>⚡ Agregar planta / equipo</label>
-          <select onChange={e => { if (e.target.value) { agregarPlanta(e.target.value); e.target.value = ""; } }} value="" style={{ ...estiloInput, marginBottom: 14 }}>
-            <option value="">Selecciona un modelo...</option>
-            {inventario.map(m => <option key={m.id} value={m.id}>{m.nombre} — {usd(m.precio)}</option>)}
-          </select>
-
-          <label style={{ fontSize: 12, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 6 }}>🔧 Agregar servicio</label>
-          <select value={svTipo} onChange={e => { setSvTipo(e.target.value); setSvMetros(""); setSvCostoM(""); setSvPrecio(""); }} style={{ ...estiloInput, marginBottom: 10 }}>
-            <option value="">Selecciona un servicio...</option>
-            {SERVICIOS_CATALOGO.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-          </select>
-
-          {esCerco && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Metros</label>
-                <input type="number" value={svMetros} onChange={e => setSvMetros(e.target.value)} placeholder="Ej: 100" style={estiloInput} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 4 }}>$/metro</label>
-                <input type="number" value={svCostoM} onChange={e => setSvCostoM(e.target.value)} placeholder="Ej: 8" style={estiloInput} />
-              </div>
-            </div>
-          )}
-          {svTipo && !esCerco && (
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 4 }}>Costo ($)</label>
-              <input type="number" value={svPrecio} onChange={e => setSvPrecio(e.target.value)} placeholder={svSel?.precio ? `Sugerido: $${svSel.precio}` : "0"} style={estiloInput} />
-            </div>
-          )}
-          {svTipo && (
-            <div style={{ marginBottom: 14 }}>
-              <Btn onClick={agregarServicio} color={ac} small>+ Agregar servicio</Btn>
-              {esCerco && svMetros && svCostoM && (
-                <span style={{ fontSize: 13, color: TEXT_SUB, marginLeft: 10 }}>Subtotal: {usd(Number(svMetros) * Number(svCostoM))}</span>
-              )}
-            </div>
-          )}
-
-          {(form.items || []).length > 0 && (
-            <div style={{ background: BG_INPUT, borderRadius: 10, padding: "10px 12px", marginBottom: 14 }}>
-              {(form.items || []).map(it => (
-                <div key={it.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${BORDER}` }}>
-                  <div>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{it.nombre}</span>
-                    {it.detalle && <p style={{ margin: "1px 0 0", fontSize: 11, color: TEXT_SUB }}>{it.detalle}</p>}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontWeight: 700, color: ac, fontSize: 13 }}>{usd(it.subtotal)}</span>
-                    <button onClick={() => eliminarItem(it.id)} style={{ background: "none", border: "none", color: RED, cursor: "pointer", fontSize: 16, padding: 0 }}>✕</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <Inp label="Notas" value={form.notas || ""} onChange={v => setForm(f => ({ ...f, notas: v }))} placeholder="Observaciones adicionales..." />
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 18, margin: "8px 0 16px", padding: "10px 0", borderTop: `2px solid ${ac}` }}>
-            <span>TOTAL</span><span style={{ color: ac }}>{usd(form.total)}</span>
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <Btn onClick={guardar} color={ac} full>Guardar cotización</Btn>
-            <Btn onClick={() => setModal(false)} color={TEXT_SUB} outline full>Cancelar</Btn>
-          </div>
         </Modal>
       )}
     </div>
@@ -447,12 +270,14 @@ function ModuloGarantias({ garantias, clientes }) {
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
-function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, cargarDemo, pinAdmin, setPinAdmin }) {
+function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, cargarDemo, pinAdmin, setPinAdmin, empresa, setEmpresa }) {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({});
   const [confirmDemo, setConfirmDemo] = useState(false);
   const [editandoPin, setEditandoPin] = useState(false);
   const [pinNuevo, setPinNuevo] = useState("");
+  const [editandoEmpresa, setEditandoEmpresa] = useState(false);
+  const [borradorEmpresa, setBorradorEmpresa] = useState({});
   const [copia, setCopia] = useState(null);   // backup leído, a la espera de confirmación
   const ac = ACENTOS.admin;
 
@@ -520,7 +345,36 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, car
           </div>
         </div>
       )}
-      <h3 style={{ margin: "0 0 10px", fontSize: 15 }}>🔑 Acceso de la oficina</h3>
+      <h3 style={{ margin: "0 0 10px", fontSize: 15 }}>🏢 Datos del presupuesto</h3>
+      <Card>
+        {!editandoEmpresa ? (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+            <div style={{ fontSize: 13, lineHeight: 1.6 }}>
+              <p style={{ margin: 0, fontWeight: 700 }}>{empresa.nombre}</p>
+              <p style={{ margin: 0, color: TEXT_SUB }}>{empresa.rif}</p>
+              <p style={{ margin: 0, color: TEXT_SUB }}>{empresa.telefonos}</p>
+            </div>
+            <Btn onClick={() => { setBorradorEmpresa({ ...empresa }); setEditandoEmpresa(true); }} color={ac} outline small>Editar</Btn>
+          </div>
+        ) : (
+          <>
+            <p style={{ margin: "0 0 12px", fontSize: 12, color: TEXT_SUB }}>Es el membrete que sale impreso en cada presupuesto.</p>
+            <Inp label="Nombre o razón social" value={borradorEmpresa.nombre || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, nombre: v }))} />
+            <Inp label="RIF" value={borradorEmpresa.rif || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, rif: v }))} />
+            <Inp label="Eslogan" value={borradorEmpresa.eslogan || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, eslogan: v }))} />
+            <Inp label="Dirección" value={borradorEmpresa.direccion || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, direccion: v }))} />
+            <Inp label="Teléfonos" value={borradorEmpresa.telefonos || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, telefonos: v }))} />
+            <Inp label="Email" value={borradorEmpresa.email || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, email: v }))} />
+            <Inp label="Web" value={borradorEmpresa.web || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, web: v }))} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn onClick={() => { setEmpresa({ ...borradorEmpresa, id: "datos" }); setEditandoEmpresa(false); }} color={ac} small full>Guardar</Btn>
+              <Btn onClick={() => setEditandoEmpresa(false)} color={TEXT_SUB} outline small full>Cancelar</Btn>
+            </div>
+          </>
+        )}
+      </Card>
+
+      <h3 style={{ margin: "20px 0 10px", fontSize: 15 }}>🔑 Acceso de la oficina</h3>
       <Card>
         {!editandoPin ? (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -628,6 +482,10 @@ export default function App() {
   const [repuestos, setRepuestos]       = useColeccion("repuestos", REPUESTOS_DEMO);
   const [garantias, setGarantias]       = useColeccion("garantias", GARANTIAS_DEMO);
   const [tecnicos, setTecnicos]         = useColeccion("tecnicos", TECNICOS_DEMO);
+  // Membrete del presupuesto: una sola ficha, pero se sincroniza igual que el
+  // resto para que ambos dispositivos emitan con los mismos datos.
+  const [empresaLista, setEmpresaLista] = useColeccion("empresa", [EMPRESA_POR_DEFECTO]);
+  const empresa = empresaLista[0] || EMPRESA_POR_DEFECTO;
 
   // La sesión y el PIN de la oficina son de este dispositivo: no se sincronizan.
   const [pinAdmin, setPinAdmin] = useState(() => cargarLS("vf_pin_admin", PIN_ADMIN_POR_DEFECTO));
@@ -651,13 +509,15 @@ export default function App() {
   // cuándo se la enseña al técnico.
   const aprobarCotizacion = q => {
     setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Aprobada" } : x));
-    const planta = q.items.find(i => i.tipo === "planta");
+    // El equipo de la tarea es la primera línea que corresponda a algo del
+    // inventario; si no hay ninguna, la primera línea del presupuesto.
+    const planta = q.items.find(i => inventario.some(m => m.nombre === i.nombre)) || q.items[0];
     setTareas(p => [...p, {
-      ...tareaVacia(q.clienteId, ""),
+      ...tareaVacia(q.clienteId),
       tipo: "Instalación",
       modelo: planta?.nombre || "",
       direccion: clientes.find(c => c.id === q.clienteId)?.direccion || "",
-      descripcion: q.items.map(i => `• ${i.nombre}${i.detalle ? ` (${i.detalle})` : ""}`).join("\n"),
+      descripcion: q.items.map(i => `• ${i.cantidad > 1 ? `${i.cantidad} × ` : ""}${i.nombre}${i.detalle ? ` (${i.detalle})` : ""}`).join("\n"),
       costo: q.total,
       duracionDias: 2,
       cotizacionId: q.id,
@@ -751,11 +611,12 @@ export default function App() {
         {tab === "inicio"       && <ModuloBienvenida setTab={setTab} stats={stats} />}
         {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} tecnicos={tecnicos} sesion={sesion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
-        {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} inventario={inventario} onAprobar={aprobarCotizacion} />}
+        {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} />}
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
-        {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos} cargarDemo={cargarDemo} pinAdmin={pinAdmin} setPinAdmin={setPinAdmin} />}
+        {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos} cargarDemo={cargarDemo} pinAdmin={pinAdmin} setPinAdmin={setPinAdmin}
+          empresa={empresa} setEmpresa={d => setEmpresaLista([d])} />}
       </div>
 
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: NAVY, zIndex: 50, boxShadow: "0 -2px 12px #0003" }}>

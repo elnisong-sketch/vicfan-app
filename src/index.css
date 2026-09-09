@@ -72,3 +72,33 @@ input, select, textarea {
     padding-bottom: 24px;
   }
 }
+
+/* ── Presupuesto imprimible ──────────────────────────────────────────────────
+   La hoja solo existe al imprimir. Se usa visibility en vez de display para
+   ocultar la app: así el navegador no recalcula toda la maquetación y la hoja
+   sale con sus propias medidas. */
+.hoja-impresion { display: none; }
+
+@media print {
+  @page { size: A4; margin: 14mm; }
+
+  body { background: #fff; }
+  body * { visibility: hidden; }
+
+  .hoja-impresion,
+  .hoja-impresion * { visibility: visible; }
+
+  .hoja-impresion {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: #fff;
+    color: #000;
+    font-family: 'Inter', Arial, sans-serif;
+  }
+
+  /* Que no se parta una línea del presupuesto entre dos páginas. */
+  .hoja-impresion tr { page-break-inside: avoid; }
+}
