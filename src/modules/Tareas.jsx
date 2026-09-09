@@ -146,7 +146,6 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura }) {
 function TarjetaTarea({ tarea, nombreCliente, nombreTecnico, esTecnico, onAbrir, onIniciar, onCerrar, onFotos, onPublicar, compacta }) {
   const atrasada = estaAtrasada(tarea);
   const publicada = estaPublicada(tarea);
-  const sinTecnico = !tarea.tecnicoId;
   return (
     <Card style={{ borderLeft: `4px solid ${ESTADO_COLOR[tarea.estado] || TEXT_SUB}`, padding: compacta ? 12 : 18, marginBottom: compacta ? 8 : 10 }}>
       <div onClick={onAbrir} style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
@@ -168,18 +167,12 @@ function TarjetaTarea({ tarea, nombreCliente, nombreTecnico, esTecnico, onAbrir,
         </div>
       </div>
 
-      {/* Publicar es lo que hace visible la tarea al técnico. Sin técnico
-          asignado no sirve de nada, así que se pide asignarlo primero. */}
+      {/* Publicar es lo único que hace visible la tarea a los técnicos. No
+          depende de a quién esté asignada: la ven todos. */}
       {!esTecnico && !publicada && estaAbierta(tarea) && (
-        sinTecnico ? (
-          <div style={{ marginTop: 10, background: BG_INPUT, borderRadius: 10, padding: "9px 12px", fontSize: 12, color: TEXT_SUB, fontWeight: 600 }}>
-            👷 Asigna un técnico para poder publicarla
-          </div>
-        ) : (
-          <div style={{ marginTop: 10 }}>
-            <Btn onClick={onPublicar} color={ACENTOS.tareas} small full>📢 Publicar a {nombreTecnico}</Btn>
-          </div>
-        )
+        <div style={{ marginTop: 10 }}>
+          <Btn onClick={onPublicar} color={ACENTOS.tareas} small full>📢 Publicar a los técnicos</Btn>
+        </div>
       )}
 
       {estaAbierta(tarea) && (esTecnico || publicada) && (
@@ -276,7 +269,8 @@ function ModalCierre({ tarea, tecnicos, sesion, onFotos, onConfirmar, onCancelar
 
       <Fotos tareaId={tarea.id} fotos={tarea.fotos || []} onCambio={onFotos} />
 
-      <Inp label="Costo final ($)" type="number" value={costoFinal} onChange={setCostoFinal} />
+      {/* El técnico nunca ve ni toca importes: el costo lo lleva la oficina. */}
+      {!esTecnico && <Inp label="Costo final ($)" type="number" value={costoFinal} onChange={setCostoFinal} />}
 
       <div style={{ background: BG_INPUT, borderRadius: 10, padding: "10px 12px", marginBottom: 14, fontSize: 12, color: TEXT_SUB }}>
         Se registrará automáticamente la fecha y hora del cierre junto con el nombre de quien lo realizó.
@@ -318,7 +312,7 @@ function Observaciones({ notas, onAgregar, quien }) {
 }
 
 // ── MODAL: DETALLE / HISTORIAL ────────────────────────────────────────────────
-function ModalDetalle({ tarea, nombreCliente, nombreTecnico, sesion, onEditar, onReprogramar, onCancelarTarea, onFotos, onObservacion, onReabrir, onPublicar, onCerrar }) {
+function ModalDetalle({ tarea, nombreCliente, nombreTecnico, tecnicos, sesion, onEditar, onReprogramar, onCancelarTarea, onFotos, onObservacion, onReabrir, onPublicar, onAsignar, onCerrar }) {
   const [nuevaFecha, setNuevaFecha] = useState(tarea.fecha);
   const [reprogramando, setReprogramando] = useState(false);
   const [confirmarReapertura, setConfirmarReapertura] = useState(false);
@@ -333,12 +327,35 @@ function ModalDetalle({ tarea, nombreCliente, nombreTecnico, sesion, onEditar, o
       </div>
       <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}>{tarea.tipo} · {fechaLarga(tarea.fecha)} · {tarea.hora}</p>
 
+      {/* Estado de publicación: lo primero que la oficina necesita ver, porque
+          es lo que decide si los técnicos tienen la tarea o no. */}
+      {!esTecnico && estaAbierta(tarea) && (
+        <div style={{ background: estaPublicada(tarea) ? ACENTOS.tareas + "11" : BG_INPUT,
+                      border: `1px solid ${estaPublicada(tarea) ? ACENTOS.tareas + "44" : BORDER}`,
+                      borderRadius: 12, padding: "12px 14px", marginBottom: 14,
+                      display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: estaPublicada(tarea) ? ACENTOS.tareas : TEXT_SUB }}>
+            {estaPublicada(tarea) ? "📢 Visible para los técnicos" : "🔒 En preparación · los técnicos no la ven"}
+          </span>
+          {estaPublicada(tarea)
+            ? <Btn onClick={() => onPublicar(false)} color={TEXT_SUB} outline small>Retirar</Btn>
+            : <Btn onClick={() => onPublicar(true)} color={ACENTOS.tareas} small>Publicar</Btn>}
+        </div>
+      )}
+
+      {/* Asignar sin pasar por el formulario de edición: es lo que más se toca. */}
+      {!esTecnico && estaAbierta(tarea) && (
+        <Sel label="👷 Técnico asignado" value={tarea.tecnicoId || ""} onChange={onAsignar}
+          options={[{ value: "", label: "— Sin asignar —" }, ...tecnicos.map(t => ({ value: t.id, label: t.nombre }))]} />
+      )}
+
       <div style={{ background: BG_INPUT, borderRadius: 12, padding: 14, marginBottom: 16, fontSize: 13, lineHeight: 1.7 }}>
-        <div>👷 <b>Técnico:</b> {nombreTecnico}</div>
+        {esTecnico && <div>👷 <b>Técnico:</b> {nombreTecnico}</div>}
         {tarea.modelo && <div>⚡ <b>Equipo:</b> {tarea.modelo}</div>}
         {tarea.direccion && <div>📍 <b>Dirección:</b> {tarea.direccion}</div>}
         <div>⏱️ <b>Duración prevista:</b> {tarea.duracionMin} min</div>
-        <div>💵 <b>Costo:</b> {usd(c?.costoFinal ?? tarea.costo)}</div>
+        {/* Los técnicos nunca ven importes. */}
+        {!esTecnico && <div>💵 <b>Costo:</b> {usd(c?.costoFinal ?? tarea.costo)}</div>}
       </div>
 
       {tarea.descripcion && (
@@ -416,9 +433,6 @@ function ModalDetalle({ tarea, nombreCliente, nombreTecnico, sesion, onEditar, o
           {estaAbierta(tarea) && <>
             <Btn onClick={onEditar} color={ac} outline small>✏️ Editar</Btn>
             <Btn onClick={() => setReprogramando(true)} color={ORANGE} outline small>📅 Reprogramar</Btn>
-            {estaPublicada(tarea)
-              ? <Btn onClick={() => onPublicar(false)} color={TEXT_SUB} outline small>🚫 Retirar al técnico</Btn>
-              : tarea.tecnicoId && <Btn onClick={() => onPublicar(true)} color={ac} outline small>📢 Publicar</Btn>}
             <Btn onClick={onCancelarTarea} color={RED} outline small>✕ Cancelar tarea</Btn>
           </>}
           {!estaAbierta(tarea) && <Btn onClick={() => setConfirmarReapertura(true)} color={ORANGE} outline small>↺ Reabrir tarea</Btn>}
@@ -486,11 +500,11 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
   const nombreCliente = id => clientes.find(c => c.id === id)?.nombre || "— sin cliente —";
   const nombreTecnico = id => tecnicos.find(t => t.id === id)?.nombre || "Sin asignar";
 
-  // Un técnico solo ve sus propias tareas, y solo las que la oficina ha
-  // publicado. Nunca las de sus compañeros ni las que están en preparación.
-  const propias = esTecnico
-    ? tareas.filter(t => t.tecnicoId === sesion.tecnicoId && estaPublicada(t))
-    : tareas;
+  // Los técnicos comparten la misma cartelera: todos ven todas las tareas que
+  // la oficina haya publicado, estén asignadas a quien estén. El técnico
+  // asignado es información de quién la lleva, no un muro de visibilidad.
+  // Lo único que decide qué ve un técnico es que esté publicada.
+  const propias = esTecnico ? tareas.filter(estaPublicada) : tareas;
   const visibles = esTecnico || filtroTecnico === "todos" ? propias : propias.filter(t => t.tecnicoId === filtroTecnico);
 
   const deHoy     = visibles.filter(t => t.fecha === hoy()).sort(ordenarPorHora);
@@ -521,7 +535,13 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
 
   const publicar = (t, valor) => actualizar(t.id, x => registrar(
     { ...x, publicada: valor },
-    valor ? `Publicada a ${nombreTecnico(x.tecnicoId)}` : "Retirada de la vista del técnico",
+    valor ? "Publicada a los técnicos" : "Retirada de la vista de los técnicos",
+    quienActua,
+  ));
+
+  const asignar = (t, tecnicoId) => actualizar(t.id, x => registrar(
+    { ...x, tecnicoId },
+    tecnicoId ? `Asignada a ${nombreTecnico(tecnicoId)}` : "Sin técnico asignado",
     quienActua,
   ));
 
@@ -569,7 +589,9 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>{esTecnico ? "📅 Mi día" : "📅 Tareas"}</h2>
-        <Btn onClick={nueva} color={ac} small>+ Nueva</Btn>
+        {/* Crear tareas es de oficina. Además, una tarea nace sin publicar, así
+            que si la creara un técnico desaparecería de su propia vista. */}
+        {!esTecnico && <Btn onClick={nueva} color={ac} small>+ Nueva</Btn>}
       </div>
 
       <Chips value={vista} onChange={setVista} color={ac} opciones={[
@@ -642,7 +664,8 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
       {detalle && !form && !cerrando && (
         <ModalDetalle tarea={tareas.find(t => t.id === detalle.id) || detalle}
           nombreCliente={nombreCliente(detalle.clienteId)} nombreTecnico={nombreTecnico(detalle.tecnicoId)}
-          sesion={sesion}
+          tecnicos={tecnicos} sesion={sesion}
+          onAsignar={id => asignar(detalle, id)}
           onEditar={() => { setForm({ ...detalle }); setDetalle(null); }}
           onReprogramar={f => reprogramar(detalle, f)}
           onCancelarTarea={() => cancelarTarea(detalle)}
