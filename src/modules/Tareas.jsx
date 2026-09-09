@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  ACENTOS, ESTADO_COLOR, PRIORIDAD_COLOR, BORDER, BG_CARD, BG_INPUT, TEXT_MAIN, TEXT_SUB, GREEN, ORANGE, RED, NAVY,
+  ACENTOS, ESTADO_COLOR, PRIORIDAD_COLOR, BORDER, BG_CARD, BG_INPUT, TEXT_MAIN, TEXT_SUB, GREEN, ORANGE, RED,
   hoy, sumarDias, inicioSemana, nombreDia, diaDelMes, fechaLarga, fechaCorta, esHoy, esPasado, horaLegible,
   usd, uid,
   Badge, Btn, Card, Inp, Area, Sel, Modal, Chips, Etiqueta, estiloInput,
@@ -156,7 +156,9 @@ function TarjetaTarea({ tarea, nombreCliente, nombreTecnico, esTecnico, onAbrir,
           </div>
           <p style={{ margin: "0 0 3px", fontSize: 13, color: TEXT_SUB }}>{tarea.tipo}{tarea.modelo ? ` · ${tarea.modelo}` : ""}</p>
           {tarea.direccion && <p style={{ margin: "0 0 3px", fontSize: 12, color: TEXT_SUB }}>📍 {tarea.direccion}</p>}
-          <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB }}>👷 {nombreTecnico}</p>
+          {/* Solo se nombra al técnico si alguien lo asignó: "Sin asignar" en
+              cada tarjeta sería ruido, porque asignar es opcional. */}
+          {tarea.tecnicoId && <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB }}>👷 {nombreTecnico}</p>}
         </div>
         <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
           <Badge text={tarea.estado} color={ESTADO_COLOR[tarea.estado] || TEXT_SUB} small />
@@ -350,7 +352,7 @@ function ModalDetalle({ tarea, nombreCliente, nombreTecnico, tecnicos, sesion, o
       )}
 
       <div style={{ background: BG_INPUT, borderRadius: 12, padding: 14, marginBottom: 16, fontSize: 13, lineHeight: 1.7 }}>
-        {esTecnico && <div>👷 <b>Técnico:</b> {nombreTecnico}</div>}
+        {esTecnico && tarea.tecnicoId && <div>👷 <b>Asignada a:</b> {nombreTecnico}</div>}
         {tarea.modelo && <div>⚡ <b>Equipo:</b> {tarea.modelo}</div>}
         {tarea.direccion && <div>📍 <b>Dirección:</b> {tarea.direccion}</div>}
         <div>⏱️ <b>Duración prevista:</b> {tarea.duracionMin} min</div>
@@ -489,7 +491,6 @@ function VistaSemana({ tareas, base, setBase, nombreCliente, abrir }) {
 export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, sesion }) {
   const [vista, setVista]         = useState("hoy");
   const [baseSemana, setBaseSemana] = useState(hoy());
-  const [filtroTecnico, setFiltroTecnico] = useState("todos");
   const [detalle, setDetalle]     = useState(null);
   const [form, setForm]           = useState(null);
   const [cerrando, setCerrando]   = useState(null);
@@ -504,13 +505,13 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
   // la oficina haya publicado, estén asignadas a quien estén. El técnico
   // asignado es información de quién la lleva, no un muro de visibilidad.
   // Lo único que decide qué ve un técnico es que esté publicada.
-  const propias = esTecnico ? tareas.filter(estaPublicada) : tareas;
-  const visibles = esTecnico || filtroTecnico === "todos" ? propias : propias.filter(t => t.tecnicoId === filtroTecnico);
+  // No hay filtro por técnico: la lista es la misma para todos. Quién hizo qué
+  // se sabe por el cierre y por el autor de cada foto y observación.
+  const visibles = esTecnico ? tareas.filter(estaPublicada) : tareas;
 
   const deHoy     = visibles.filter(t => t.fecha === hoy()).sort(ordenarPorHora);
   const atrasadas = visibles.filter(estaAtrasada).sort((a, b) => a.fecha.localeCompare(b.fecha));
   const proximas  = visibles.filter(t => estaAbierta(t) && t.fecha > hoy()).sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
-  const sinAsignar = visibles.filter(t => estaAbierta(t) && !t.tecnicoId);
 
   const actualizar = (id, fn) => setTareas(p => p.map(t => t.id === id ? fn(t) : t));
 
@@ -600,10 +601,6 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
         { value: "todas",  label: "Todas" },
       ]} />
 
-      {!esTecnico && tecnicos.length > 1 && (
-        <Chips value={filtroTecnico} onChange={setFiltroTecnico} color={NAVY}
-          opciones={[{ value: "todos", label: "Todos" }, ...tecnicos.map(t => ({ value: t.id, label: t.nombre }))]} />
-      )}
 
       {vista === "hoy" && (
         <div>
@@ -621,12 +618,6 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
                   {tarjeta(t)}
                 </div>
               ))}
-            </div>
-          )}
-
-          {sinAsignar.length > 0 && (
-            <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#856404", fontWeight: 600 }}>
-              👷 {sinAsignar.length} tarea{sinAsignar.length > 1 ? "s" : ""} sin técnico asignado
             </div>
           )}
 
