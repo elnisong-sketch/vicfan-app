@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { db } from "./firebase";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { useColeccion } from "./datos.js";
 import {
   NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BG_INPUT, BORDER, TEXT_MAIN, TEXT_SUB,
   ACENTOS, ESTADO_COLOR, hoy, dn, usd, uid, cargarLS,
@@ -613,75 +612,24 @@ function ModuloBienvenida({ setTab, stats }) {
 // ── APP PRINCIPAL ─────────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab]                   = useState("inicio");
-  const [clientes, setClientes]         = useState(() => cargarLS("vf_clientes", CLIENTES_DEMO));
-  const [cotizaciones, setCotizaciones] = useState(() => cargarLS("vf_cotizaciones", COTIZACIONES_DEMO));
-  const [ventas, setVentas]             = useState(() => cargarLS("vf_ventas", VENTAS_DEMO));
-  const [tareas, setTareas]             = useState(cargarTareas);
-  const [inventario, setInventario]     = useState(() => cargarLS("vf_inventario", MODELOS_DEMO));
-  const [repuestos, setRepuestos]       = useState(() => cargarLS("vf_repuestos", REPUESTOS_DEMO));
-  const [garantias, setGarantias]       = useState(() => cargarLS("vf_garantias", GARANTIAS_DEMO));
-  const [tecnicos, setTecnicos]         = useState(() => cargarLS("vf_tecnicos", TECNICOS_DEMO));
-  const [pinAdmin, setPinAdmin]         = useState(() => cargarLS("vf_pin_admin", PIN_ADMIN_POR_DEFECTO));
-  const [sesion, setSesion]             = useState(() => cargarLS("vf_sesion", null));
-  const [listo, setListo]               = useState(false);
-
-  // El guardado local NUNCA depende de Firebase. Un técnico en la calle sin
-  // señal tiene que conservar su trabajo en el teléfono igual; la nube es un
-  // extra que se intenta aparte y puede fallar sin arrastrar nada consigo.
-  const guardarLocal = (key, data) => { try { localStorage.setItem(key, JSON.stringify(data)); } catch {} };
-  const subir = (key, data) => { setDoc(doc(db, "vicfan", key), { valor: JSON.stringify(data) }).catch(() => {}); };
-
-  // `listo` marca que ya conocemos el estado remoto: hasta entonces no se sube
-  // nada, para no pisar en Firestore lo que otro dispositivo tenga más nuevo.
-  // Al volverse true, este mismo efecto sube lo que se haya acumulado offline.
-  const sync = (key, data) => { guardarLocal(key, data); if (listo) subir(key, data); };
-
-  useEffect(() => { sync("vf_clientes", clientes); },         [JSON.stringify(clientes), listo]);
-  useEffect(() => { sync("vf_cotizaciones", cotizaciones); }, [JSON.stringify(cotizaciones), listo]);
-  useEffect(() => { sync("vf_ventas", ventas); },             [JSON.stringify(ventas), listo]);
-  useEffect(() => { sync("vf_tareas", tareas); },             [JSON.stringify(tareas), listo]);
-  useEffect(() => { sync("vf_inventario", inventario); },     [JSON.stringify(inventario), listo]);
-  useEffect(() => { sync("vf_repuestos", repuestos); },       [JSON.stringify(repuestos), listo]);
-  useEffect(() => { sync("vf_garantias", garantias); },       [JSON.stringify(garantias), listo]);
-  useEffect(() => { sync("vf_tecnicos", tecnicos); },         [JSON.stringify(tecnicos), listo]);
+  // Cada lista es un documento por registro en Firestore (ver datos.js). El
+  // arranque siempre es local, así que la app abre y funciona sin red.
+  const [clientes, setClientes]         = useColeccion("clientes", CLIENTES_DEMO);
+  const [cotizaciones, setCotizaciones] = useColeccion("cotizaciones", COTIZACIONES_DEMO);
+  const [ventas, setVentas]             = useColeccion("ventas", VENTAS_DEMO);
+  const [tareas, setTareas]             = useColeccion("tareas", cargarTareas);
+  const [inventario, setInventario]     = useColeccion("inventario", MODELOS_DEMO);
+  const [repuestos, setRepuestos]       = useColeccion("repuestos", REPUESTOS_DEMO);
+  const [garantias, setGarantias]       = useColeccion("garantias", GARANTIAS_DEMO);
+  const [tecnicos, setTecnicos]         = useColeccion("tecnicos", TECNICOS_DEMO);
 
   // La sesión y el PIN de la oficina son de este dispositivo: no se sincronizan.
+  const [pinAdmin, setPinAdmin] = useState(() => cargarLS("vf_pin_admin", PIN_ADMIN_POR_DEFECTO));
+  const [sesion, setSesion]     = useState(() => cargarLS("vf_sesion", null));
+
+  const guardarLocal = (clave, valor) => { try { localStorage.setItem(clave, JSON.stringify(valor)); } catch {} };
   useEffect(() => { guardarLocal("vf_sesion", sesion); }, [JSON.stringify(sesion)]);
   useEffect(() => { guardarLocal("vf_pin_admin", pinAdmin); }, [pinAdmin]);
-
-  // Antes solo se escuchaba "vf_clientes": el resto se subía a Firestore pero
-  // nunca se bajaba, así que el cierre de una tarea hecho por un técnico no
-  // llegaba nunca a la oficina. Ahora se escuchan las ocho colecciones.
-  useEffect(() => {
-    const receptores = {
-      vf_clientes: setClientes, vf_cotizaciones: setCotizaciones, vf_ventas: setVentas,
-      vf_tareas: setTareas, vf_inventario: setInventario, vf_repuestos: setRepuestos,
-      vf_garantias: setGarantias, vf_tecnicos: setTecnicos,
-    };
-    // No se sube nada hasta que las ocho hayan contestado, para no pisar en la
-    // nube datos más nuevos que los que este dispositivo tenga guardados.
-    const contestadas = new Set();
-    const yaContesto = clave => {
-      contestadas.add(clave);
-      if (contestadas.size === Object.keys(receptores).length) setListo(true);
-    };
-
-    const unsubs = Object.entries(receptores).map(([clave, aplicar]) =>
-      onSnapshot(doc(db, "vicfan", clave), snap => {
-        if (snap.exists()) {
-          try {
-            const remoto = JSON.parse(snap.data().valor);
-            // Devolver la misma referencia cuando no hay cambio evita el bucle
-            // nube → estado → nube, que dispararía escrituras infinitas.
-            aplicar(actual => JSON.stringify(actual) === JSON.stringify(remoto) ? actual : remoto);
-            guardarLocal(clave, remoto);
-          } catch {}
-        }
-        yaContesto(clave);
-      }, () => yaContesto(clave))
-    );
-    return () => unsubs.forEach(u => u());
-  }, []);
 
   const cargarDemo = () => {
     setClientes(CLIENTES_DEMO); setCotizaciones(COTIZACIONES_DEMO); setVentas(VENTAS_DEMO);
