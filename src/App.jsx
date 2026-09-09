@@ -649,16 +649,38 @@ export default function App() {
   useEffect(() => { guardarLocal("vf_sesion", sesion); }, [JSON.stringify(sesion)]);
   useEffect(() => { guardarLocal("vf_pin_admin", pinAdmin); }, [pinAdmin]);
 
+  // Antes solo se escuchaba "vf_clientes": el resto se subía a Firestore pero
+  // nunca se bajaba, así que el cierre de una tarea hecho por un técnico no
+  // llegaba nunca a la oficina. Ahora se escuchan las ocho colecciones.
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "vicfan", "vf_clientes"), snap => {
-      if (snap.exists()) {
-        const d = JSON.parse(snap.data().valor);
-        setClientes(d);
-        try { localStorage.setItem("vf_clientes", JSON.stringify(d)); } catch {}
-      }
-      setListo(true);
-    }, () => setListo(true));
-    return () => unsub();
+    const receptores = {
+      vf_clientes: setClientes, vf_cotizaciones: setCotizaciones, vf_ventas: setVentas,
+      vf_tareas: setTareas, vf_inventario: setInventario, vf_repuestos: setRepuestos,
+      vf_garantias: setGarantias, vf_tecnicos: setTecnicos,
+    };
+    // No se sube nada hasta que las ocho hayan contestado, para no pisar en la
+    // nube datos más nuevos que los que este dispositivo tenga guardados.
+    const contestadas = new Set();
+    const yaContesto = clave => {
+      contestadas.add(clave);
+      if (contestadas.size === Object.keys(receptores).length) setListo(true);
+    };
+
+    const unsubs = Object.entries(receptores).map(([clave, aplicar]) =>
+      onSnapshot(doc(db, "vicfan", clave), snap => {
+        if (snap.exists()) {
+          try {
+            const remoto = JSON.parse(snap.data().valor);
+            // Devolver la misma referencia cuando no hay cambio evita el bucle
+            // nube → estado → nube, que dispararía escrituras infinitas.
+            aplicar(actual => JSON.stringify(actual) === JSON.stringify(remoto) ? actual : remoto);
+            guardarLocal(clave, remoto);
+          } catch {}
+        }
+        yaContesto(clave);
+      }, () => yaContesto(clave))
+    );
+    return () => unsubs.forEach(u => u());
   }, []);
 
   const cargarDemo = () => {

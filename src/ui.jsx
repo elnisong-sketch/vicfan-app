@@ -31,11 +31,19 @@ export const ESTADO_COLOR = {
 export const PRIORIDAD_COLOR = { "Normal": TEXT_SUB, "Alta": "#f59e0b", "Urgente": RED };
 
 // ── HELPERS DE FECHA ──────────────────────────────────────────────────────────
+// Todo el sistema funciona en hora de Venezuela, no en la del dispositivo.
+// La oficina está en España y los técnicos en Venezuela: son 5-6 horas de
+// diferencia, así que sin fijar la zona, durante la madrugada española la
+// oficina vería "hoy, día 10" mientras el técnico sigue en el día 9 y las
+// tareas del día no cuadrarían entre ambos. "Hoy" es el día del negocio.
+const ZONA = "America/Caracas";
+
 // Se ancla el mediodía para que el cambio de huso horario nunca corra el día.
 const aFecha = iso => new Date(`${iso}T12:00:00`);
 const aISO   = d => d.toISOString().split("T")[0];
 
-export const hoy = () => aISO(new Date(new Date().setHours(12, 0, 0, 0)));
+// "en-CA" da el formato AAAA-MM-DD, que es el que usa toda la app.
+export const hoy = () => new Intl.DateTimeFormat("en-CA", { timeZone: ZONA, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 export const dn  = n => sumarDias(hoy(), -n);
 export const sumarDias = (iso, n) => { const d = aFecha(iso); d.setDate(d.getDate() + n); return aISO(d); };
 /** Lunes de la semana a la que pertenece `iso`. */
@@ -46,7 +54,10 @@ export const fechaLarga = iso => aFecha(iso).toLocaleDateString("es-VE", { weekd
 export const fechaCorta = iso => aFecha(iso).toLocaleDateString("es-VE", { day: "2-digit", month: "short" });
 export const esHoy = iso => iso === hoy();
 export const esPasado = iso => iso < hoy();
-export const horaLegible = ts => new Date(ts).toLocaleString("es-VE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+// Los sellos de hora se muestran en hora de Venezuela: si un técnico cerró una
+// tarea a las 3 de la tarde, la oficina en España tiene que leer "3 de la
+// tarde", que es cuando ocurrió para quien estaba allí.
+export const horaLegible = ts => new Date(ts).toLocaleString("es-VE", { timeZone: ZONA, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
 // ── HELPERS VARIOS ────────────────────────────────────────────────────────────
 export const usd = n => `$${Number(n || 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
