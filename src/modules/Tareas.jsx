@@ -3,7 +3,7 @@ import {
   ACENTOS, ESTADO_COLOR, PRIORIDAD_COLOR, BORDER, BG_CARD, BG_INPUT, TEXT_MAIN, TEXT_SUB, GREEN, ORANGE, RED, NAVY,
   hoy, sumarDias, inicioSemana, nombreDia, diaDelMes, fechaLarga, fechaCorta, esHoy, esPasado, horaLegible,
   usd, uid,
-  Badge, Btn, Card, Inp, Area, Sel, Modal, Chips, Etiqueta,
+  Badge, Btn, Card, Inp, Area, Sel, Modal, Chips, Etiqueta, estiloInput,
 } from "../ui.jsx";
 import { guardarFoto, fotosDeTarea, borrarFoto } from "../fotos.js";
 
@@ -34,8 +34,10 @@ export const tareaVacia = (clienteId, tecnicoId) => ({
   costo: 0,
   notas: "",
   fotos: [],
+  observaciones: [],
   historial: [],
   cierre: null,
+  cierresPrevios: [],
   creadaEn: new Date().toISOString(),
 });
 
@@ -265,11 +267,40 @@ function ModalCierre({ tarea, tecnicos, sesion, onFotos, onConfirmar, onCancelar
   );
 }
 
+// ── OBSERVACIONES ─────────────────────────────────────────────────────────────
+// Se acumulan en vez de sobrescribirse: cada nota queda firmada y fechada, de
+// modo que la oficina puede leer lo que el técnico fue anotando durante el
+// trabajo sin que una nota tape a la anterior.
+function Observaciones({ notas, onAgregar, quien }) {
+  const [texto, setTexto] = useState("");
+  const agregar = () => { if (!texto.trim()) return; onAgregar(texto.trim()); setTexto(""); };
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <Etiqueta>💬 Observaciones {notas.length > 0 && `(${notas.length})`}</Etiqueta>
+
+      {notas.map(n => (
+        <div key={n.id} style={{ background: BG_INPUT, borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+          <p style={{ margin: "0 0 4px", fontSize: 14 }}>{n.texto}</p>
+          <p style={{ margin: 0, fontSize: 11, color: TEXT_SUB, fontWeight: 700 }}>{n.autor} · {horaLegible(n.cuando)}</p>
+        </div>
+      ))}
+
+      <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2}
+        placeholder={`Escribe una observación como ${quien}…`}
+        style={{ ...estiloInput, resize: "vertical", marginBottom: 8 }} />
+      <Btn onClick={agregar} color={ac} outline small disabled={!texto.trim()}>+ Añadir observación</Btn>
+    </div>
+  );
+}
+
 // ── MODAL: DETALLE / HISTORIAL ────────────────────────────────────────────────
-function ModalDetalle({ tarea, nombreCliente, nombreTecnico, onEditar, onReprogramar, onCancelarTarea, onFotos, onCerrar }) {
+function ModalDetalle({ tarea, nombreCliente, nombreTecnico, sesion, onEditar, onReprogramar, onCancelarTarea, onFotos, onObservacion, onReabrir, onCerrar }) {
   const [nuevaFecha, setNuevaFecha] = useState(tarea.fecha);
   const [reprogramando, setReprogramando] = useState(false);
+  const [confirmarReapertura, setConfirmarReapertura] = useState(false);
   const c = tarea.cierre;
+  const esTecnico = sesion?.rol === "tecnico";
 
   return (
     <Modal onClose={onCerrar}>
@@ -305,7 +336,24 @@ function ModalDetalle({ tarea, nombreCliente, nombreTecnico, onEditar, onReprogr
 
       {/* Las fotos se pueden cargar en cualquier momento, no solo al cerrar:
           el técnico necesita documentar el "antes" apenas llega al sitio. */}
-      <Fotos tareaId={tarea.id} fotos={tarea.fotos || []} onCambio={onFotos} soloLectura={tarea.estado === "Cancelada"} />
+      {/* Una vez cerrada la tarea, el técnico ya no puede tocar las fotos: son
+          la evidencia de lo que entregó. La oficina sí conserva el control. */}
+      <Fotos tareaId={tarea.id} fotos={tarea.fotos || []} onCambio={onFotos}
+        soloLectura={tarea.estado === "Cancelada" || (esTecnico && !estaAbierta(tarea))} />
+
+      <Observaciones notas={tarea.observaciones || []} onAgregar={onObservacion} quien={sesion?.nombre || "Oficina"} />
+
+      {tarea.cierresPrevios?.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <Etiqueta>Cierres anteriores</Etiqueta>
+          {tarea.cierresPrevios.map((p, i) => (
+            <div key={i} style={{ background: BG_INPUT, borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+              <p style={{ margin: "0 0 4px", fontSize: 13 }}>{p.trabajoRealizado}</p>
+              <p style={{ margin: 0, fontSize: 11, color: TEXT_SUB, fontWeight: 700 }}>{p.tecnicoNombre} · {horaLegible(p.cerradaEn)}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {tarea.historial?.length > 0 && (
         <div style={{ marginBottom: 16 }}>
@@ -327,11 +375,27 @@ function ModalDetalle({ tarea, nombreCliente, nombreTecnico, onEditar, onReprogr
             <Btn onClick={() => setReprogramando(false)} color={TEXT_SUB} outline small full>Cancelar</Btn>
           </div>
         </div>
-      ) : estaAbierta(tarea) && (
+      ) : confirmarReapertura ? (
+        <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#856404" }}>
+            La tarea volverá a estar programada. El cierre actual y sus fotos se conservan como registro.
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn onClick={() => { onReabrir(); setConfirmarReapertura(false); }} color={ORANGE} full small>Reabrir</Btn>
+            <Btn onClick={() => setConfirmarReapertura(false)} color={TEXT_SUB} outline full small>Cancelar</Btn>
+          </div>
+        </div>
+      ) : !esTecnico && (
+        // Editar, reprogramar, cancelar y reabrir son decisiones de oficina.
+        // El técnico documenta lo que hace (fotos y observaciones), no cambia
+        // la planificación ni reabre lo que ya cerró.
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-          <Btn onClick={onEditar} color={ac} outline small>✏️ Editar</Btn>
-          <Btn onClick={() => setReprogramando(true)} color={ORANGE} outline small>📅 Reprogramar</Btn>
-          <Btn onClick={onCancelarTarea} color={RED} outline small>✕ Cancelar tarea</Btn>
+          {estaAbierta(tarea) && <>
+            <Btn onClick={onEditar} color={ac} outline small>✏️ Editar</Btn>
+            <Btn onClick={() => setReprogramando(true)} color={ORANGE} outline small>📅 Reprogramar</Btn>
+            <Btn onClick={onCancelarTarea} color={RED} outline small>✕ Cancelar tarea</Btn>
+          </>}
+          {!estaAbierta(tarea) && <Btn onClick={() => setConfirmarReapertura(true)} color={ORANGE} outline small>↺ Reabrir tarea</Btn>}
         </div>
       )}
 
@@ -425,6 +489,21 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
     actualizar(t.id, x => registrar({ ...x, estado: "Cancelada" }, "Cancelada", quienActua));
     setDetalle(null);
   };
+
+  const agregarObservacion = (t, texto) => actualizar(t.id, x => ({
+    ...x,
+    observaciones: [...(x.observaciones || []), { id: uid(), texto, autor: quienActua, cuando: new Date().toISOString() }],
+  }));
+
+  // Reabrir no borra el cierre anterior: lo archiva. Si una instalación hubo
+  // que rehacerla, tiene que quedar constancia de que se cerró una primera vez
+  // y de quién la cerró.
+  const reabrir = t => actualizar(t.id, x => registrar({
+    ...x,
+    estado: "Programada",
+    cierresPrevios: [...(x.cierresPrevios || []), x.cierre].filter(Boolean),
+    cierre: null,
+  }, "Reabierta", quienActua));
 
   const guardar = () => {
     if (!form.clienteId) return;
@@ -527,10 +606,13 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
       {detalle && !form && !cerrando && (
         <ModalDetalle tarea={tareas.find(t => t.id === detalle.id) || detalle}
           nombreCliente={nombreCliente(detalle.clienteId)} nombreTecnico={nombreTecnico(detalle.tecnicoId)}
+          sesion={sesion}
           onEditar={() => { setForm({ ...detalle }); setDetalle(null); }}
           onReprogramar={f => reprogramar(detalle, f)}
           onCancelarTarea={() => cancelarTarea(detalle)}
           onFotos={fotos => actualizar(detalle.id, x => ({ ...x, fotos }))}
+          onObservacion={texto => agregarObservacion(detalle, texto)}
+          onReabrir={() => reabrir(detalle)}
           onCerrar={() => setDetalle(null)} />
       )}
 
