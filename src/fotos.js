@@ -1,18 +1,24 @@
-// Almacén local de fotos de tareas.
+import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { db } from "./firebase";
+
+// Fotos de las tareas.
 //
-// Las imágenes NO van en localStorage: un teléfono dispara fotos de 3–5 MB y
-// localStorage tiene ~5 MB en total para toda la app. Si se llena, deja de
-// guardarse absolutamente todo (clientes, ventas, tareas). Por eso las fotos
-// viven en IndexedDB, que tiene cuota propia de cientos de MB.
+// Cada foto es SU PROPIO documento en Firestore (`vicfan_fotos/{id}`), no un
+// campo dentro de la tarea. Una tarea con ocho fotos superaría el límite de
+// 1 MB por documento; separadas, cada una ronda los 150-200 KB y sobra sitio.
 //
-// Cada foto se guarda con `subida: false`. Cuando se conecte el almacenamiento
-// en la nube (Firebase Storage o Cloudinary), el proceso de subida lee las
-// pendientes, las envía y marca `subida: true` con su URL remota. Esa es la
-// cola de reintentos para trabajar sin señal.
+// El dispositivo guarda además una copia en IndexedDB, que hace dos papeles:
+//   · cola de subida — el técnico fotografía sin señal y se envía al volver
+//   · caché — lo ya descargado no se vuelve a pedir
+//
+// Por eso NO se cargan todas las fotos al arrancar: se piden una a una cuando
+// se abre la tarea que las contiene. Bajarlas todas al móvil de un técnico
+// sería gastarle los datos sin motivo.
 
 const DB_NOMBRE = "vicfan_fotos";
 const ALMACEN = "fotos";
 const VERSION = 1;
+const COLECCION = "vicfan_fotos";
 
 function abrirDB() {
   return new Promise((resolve, reject) => {
@@ -39,10 +45,20 @@ function conAlmacen(modo, fn) {
   }));
 }
 
+const leerLocal = id => conAlmacen("readonly", store => {
+  const salida = { valor: null };
+  store.get(id).onsuccess = e => { salida.valor = e.target.result || null; };
+  return salida;
+});
+
+const guardarLocal = registro => conAlmacen("readwrite", store => { store.put(registro); return {}; });
+
+// ── COMPRESIÓN ────────────────────────────────────────────────────────────────
+
 /**
  * Reduce la foto antes de guardarla. Un técnico en la calle con datos móviles
  * no va a subir 4 MB: se le cuelga y termina cerrando tareas sin evidencia.
- * A 1280 px y calidad 0.7 una foto queda en 100–200 KB y el número de serie
+ * A 1280 px y calidad 0.7 una foto queda en 100-200 KB y el número de serie
  * de una placa se sigue leyendo sin problema.
  */
 export async function comprimirImagen(file, maxLado = 1280, calidad = 0.7, tipo = "image/jpeg") {
@@ -68,39 +84,81 @@ export async function comprimirImagen(file, maxLado = 1280, calidad = 0.7, tipo 
   return new Promise(resolve => canvas.toBlob(resolve, tipo, calidad));
 }
 
+const blobADataUrl = blob => new Promise((res, rej) => {
+  const l = new FileReader();
+  l.onload = () => res(l.result);
+  l.onerror = () => rej(l.error);
+  l.readAsDataURL(blob);
+});
+
+const dataUrlABlob = url => fetch(url).then(r => r.blob());
+
+// ── GUARDAR Y SUBIR ───────────────────────────────────────────────────────────
+
+/** Guarda la foto en el dispositivo e intenta subirla. Nunca falla por la red. */
 export async function guardarFoto({ id, tareaId, tipo, file }) {
   const blob = await comprimirImagen(file);
-  const registro = { id, tareaId, tipo, blob, bytes: blob.size, creadaEn: new Date().toISOString(), subida: false, url: null };
-  await conAlmacen("readwrite", store => { store.put(registro); return {}; });
+  const registro = { id, tareaId, tipo, blob, bytes: blob.size, creadaEn: new Date().toISOString(), subida: false };
+  await guardarLocal(registro);
+  subirFoto(registro).catch(() => {});   // en segundo plano; si falla, queda en cola
   return registro;
 }
 
-export async function fotosDeTarea(tareaId) {
-  return conAlmacen("readonly", store => {
-    const salida = { valor: [] };
-    store.index("tareaId").openCursor(IDBKeyRange.only(tareaId)).onsuccess = e => {
-      const cursor = e.target.result;
-      if (cursor) { salida.valor.push(cursor.value); cursor.continue(); }
-    };
-    return salida;
+async function subirFoto(registro) {
+  const datos = await blobADataUrl(registro.blob);
+  await setDoc(doc(db, COLECCION, registro.id), {
+    id: registro.id,
+    tareaId: registro.tareaId,
+    tipo: registro.tipo,
+    datos,
+    creadaEn: registro.creadaEn,
   });
+  await guardarLocal({ ...registro, subida: true });
 }
 
-export async function borrarFoto(id) {
-  return conAlmacen("readwrite", store => { store.delete(id); return {}; });
+/**
+ * Sube todo lo que quedó pendiente. Se llama al pulsar Guardar y al recuperar
+ * la conexión.
+ * @returns {{subidas:number, pendientes:number}}
+ */
+export async function subirPendientes() {
+  const cola = await pendientesDeSubir();
+  let subidas = 0;
+  for (const registro of cola) {
+    try { await subirFoto(registro); subidas++; } catch { /* sigue en cola */ }
+  }
+  const restantes = await pendientesDeSubir();
+  return { subidas, pendientes: restantes.length };
 }
 
-export async function borrarFotosDeTarea(tareaId) {
-  return conAlmacen("readwrite", store => {
-    store.index("tareaId").openCursor(IDBKeyRange.only(tareaId)).onsuccess = e => {
-      const cursor = e.target.result;
-      if (cursor) { cursor.delete(); cursor.continue(); }
-    };
-    return {};
-  });
+// ── LEER ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Devuelve el blob de una foto. Si este dispositivo no la tiene (la tomó otro),
+ * la baja de Firestore y la deja cacheada.
+ */
+export async function asegurarFoto(id) {
+  const local = await leerLocal(id).catch(() => null);
+  if (local?.blob) return local.blob;
+
+  const snap = await getDoc(doc(db, COLECCION, id));
+  if (!snap.exists()) return null;
+
+  const d = snap.data();
+  const blob = await dataUrlABlob(d.datos);
+  await guardarLocal({ id, tareaId: d.tareaId, tipo: d.tipo, blob, bytes: blob.size, creadaEn: d.creadaEn, subida: true })
+    .catch(() => {});
+  return blob;
 }
 
-/** Cuántas fotos siguen sin subir a la nube y cuánto pesan. */
+/** Cuántas fotos de esta lista siguen sin subir en este dispositivo. */
+export async function contarPendientes(ids = []) {
+  if (!ids.length) return 0;
+  const cola = await pendientesDeSubir().catch(() => []);
+  const enCola = new Set(cola.map(f => f.id));
+  return ids.filter(id => enCola.has(id)).length;
+}
+
 export async function pendientesDeSubir() {
   return conAlmacen("readonly", store => {
     const salida = { valor: [] };
@@ -110,4 +168,11 @@ export async function pendientesDeSubir() {
     };
     return salida;
   });
+}
+
+// ── BORRAR ────────────────────────────────────────────────────────────────────
+
+export async function borrarFoto(id) {
+  await conAlmacen("readwrite", store => { store.delete(id); return {}; });
+  await deleteDoc(doc(db, COLECCION, id)).catch(() => {});
 }

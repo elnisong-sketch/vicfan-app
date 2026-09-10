@@ -5,7 +5,7 @@ import {
   usd, uid,
   Badge, Btn, Card, Inp, Area, Sel, Modal, Chips, Etiqueta, estiloInput,
 } from "../ui.jsx";
-import { guardarFoto, fotosDeTarea, borrarFoto } from "../fotos.js";
+import { guardarFoto, asegurarFoto, borrarFoto, subirPendientes, contarPendientes } from "../fotos.js";
 
 const ac = ACENTOS.tareas;
 
@@ -68,18 +68,28 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura }) {
   const [urls, setUrls] = useState({});
   const [cargando, setCargando] = useState(false);
   const [ampliada, setAmpliada] = useState(null);
+  // El arreglo cambia de identidad en cada render; la lista de ids no.
+  const clave = fotos.map(f => f.id).join(",");
 
+  // Se resuelve foto a foto: las que tomó este dispositivo salen de su copia
+  // local, y las que tomó el otro técnico se bajan de Firestore la primera vez
+  // y quedan cacheadas. Así la oficina ve lo que subieron desde la calle.
   useEffect(() => {
     let vivo = true;
     const creadas = [];
-    fotosDeTarea(tareaId).then(registros => {
-      if (!vivo) return;
-      const mapa = {};
-      registros.forEach(r => { const u = URL.createObjectURL(r.blob); mapa[r.id] = u; creadas.push(u); });
-      setUrls(mapa);
-    }).catch(() => {});
+    (async () => {
+      for (const f of fotos) {
+        const blob = await asegurarFoto(f.id).catch(() => null);
+        if (!vivo) return;
+        if (!blob) continue;
+        const url = URL.createObjectURL(blob);
+        creadas.push(url);
+        setUrls(prev => ({ ...prev, [f.id]: url }));
+      }
+    })();
     return () => { vivo = false; creadas.forEach(URL.revokeObjectURL); };
-  }, [tareaId, fotos.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clave]);
 
   const agregar = async e => {
     const archivos = Array.from(e.target.files || []);
@@ -290,6 +300,59 @@ function ModalCierre({ tarea, tecnicos, sesion, onFotos, onConfirmar, onCancelar
   );
 }
 
+// ── GUARDAR EN LÍNEA ──────────────────────────────────────────────────────────
+// Las anotaciones viajan solas en cuanto se escriben, pero las fotos pesan y
+// pueden quedarse en cola sin señal. Este botón le da al técnico algo que
+// pulsar y, sobre todo, una respuesta clara de si su trabajo ya está a salvo.
+function GuardarEnLinea({ fotos }) {
+  const [pendientes, setPendientes] = useState(0);
+  const [estado, setEstado] = useState("");   // "" | "subiendo" | "ok" | "error"
+
+  const ids = fotos.map(f => f.id);
+  const clave = ids.join(",");
+
+  const revisar = () => contarPendientes(ids).then(setPendientes).catch(() => {});
+  useEffect(() => { revisar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clave]);
+
+  // Al recuperar la conexión se reintenta solo, sin esperar a que pulse nada.
+  useEffect(() => {
+    const alVolver = () => subirPendientes().then(r => setPendientes(r.pendientes)).catch(() => {});
+    window.addEventListener("online", alVolver);
+    return () => window.removeEventListener("online", alVolver);
+  }, []);
+
+  const guardar = async () => {
+    setEstado("subiendo");
+    try {
+      const r = await subirPendientes();
+      setPendientes(r.pendientes);
+      setEstado(r.pendientes === 0 ? "ok" : "error");
+    } catch {
+      setEstado("error");
+      revisar();
+    }
+    setTimeout(() => setEstado(""), 4000);
+  };
+
+  const mensaje =
+    estado === "subiendo" ? "Subiendo…" :
+    estado === "ok"       ? "✓ Guardado en línea" :
+    estado === "error"    ? `Sin conexión · ${pendientes} foto${pendientes === 1 ? "" : "s"} en espera` :
+    pendientes > 0        ? `${pendientes} foto${pendientes === 1 ? "" : "s"} sin subir` :
+                            "✓ Todo guardado en línea";
+
+  const color = pendientes > 0 && estado !== "subiendo" ? ORANGE : GREEN;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, background: BG_INPUT, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "10px 12px", marginBottom: 16 }}>
+      <span style={{ flex: 1, fontSize: 12.5, fontWeight: 700, color }}>{mensaje}</span>
+      <Btn onClick={guardar} color={color} small disabled={estado === "subiendo"}>
+        {pendientes > 0 ? "💾 Guardar" : "↻ Comprobar"}
+      </Btn>
+    </div>
+  );
+}
+
 // ── OBSERVACIONES ─────────────────────────────────────────────────────────────
 // Se acumulan en vez de sobrescribirse: cada nota queda firmada y fechada, de
 // modo que la oficina puede leer lo que el técnico fue anotando durante el
@@ -382,6 +445,8 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
         soloLectura={tarea.estado === "Cancelada" || (esTecnico && !estaAbierta(tarea))} />
 
       <Observaciones notas={tarea.observaciones || []} onAgregar={onObservacion} quien={sesion?.nombre || "Oficina"} />
+
+      <GuardarEnLinea fotos={tarea.fotos || []} />
 
       {tarea.cierresPrevios?.length > 0 && (
         <div style={{ marginBottom: 16 }}>
