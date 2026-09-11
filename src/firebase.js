@@ -20,7 +20,7 @@ const firebaseConfig = {
 // Reutiliza la app si ya existe. Al recargar en caliente durante el desarrollo
 // este módulo se vuelve a ejecutar, y llamar dos veces a initializeApp lanza
 // "app/duplicate-app" y rompe la recarga.
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 // Caché persistente: con datos móviles inestables (el caso de los técnicos en
 // Venezuela) Firestore sigue leyendo y escribiendo sin conexión, y encola los

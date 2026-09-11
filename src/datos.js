@@ -30,8 +30,11 @@ const limpiar = obj => JSON.parse(JSON.stringify(obj));
  *
  * @param nombre  nombre de la colección, sin prefijo ("tareas", "clientes"…)
  * @param semilla datos iniciales si no hay nada guardado (valor o función)
+ * @param activa  si es false, no se conecta a la nube. Se usa para que un
+ *                técnico no intente siquiera leer las cotizaciones: las reglas
+ *                se lo negarían y solo conseguiría errores en pantalla.
  */
-export function useColeccion(nombre, semilla) {
+export function useColeccion(nombre, semilla, activa = true) {
   const claveLS = `vf_${nombre}`;
   const ruta = `vicfan_${nombre}`;
 
@@ -50,6 +53,7 @@ export function useColeccion(nombre, semilla) {
 
   // ── Bajar: escuchar la colección ────────────────────────────────────────────
   useEffect(() => {
+    if (!activa) return;
     const unsub = onSnapshot(collection(db, ruta), snap => {
       const remotos = snap.docs.map(d => d.data());
 
@@ -66,11 +70,11 @@ export function useColeccion(nombre, semilla) {
       setItems(actual => igual(actual, remotos) ? actual : remotos);
     }, () => {});
     return () => unsub();
-  }, [ruta]);
+  }, [ruta, activa]);
 
   // ── Subir: mandar solo lo que cambió ────────────────────────────────────────
   useEffect(() => {
-    if (enNube.current === null) return;
+    if (!activa || enNube.current === null) return;
 
     const antes = porId(enNube.current);
     const ahora = porId(items);
@@ -96,7 +100,7 @@ export function useColeccion(nombre, semilla) {
       }
       lote.commit().catch(() => {});
     }
-  }, [ruta, items]);
+  }, [ruta, items, activa]);
 
   return [items, setItems];
 }

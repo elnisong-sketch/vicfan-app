@@ -1,0 +1,89 @@
+rules_version = '2';
+
+// Reglas de seguridad de VICFAN.
+//
+// Esto es lo único que protege los datos de verdad. Lo que hace la app en el
+// navegador es comodidad: esconde pantallas para que nadie se confunda, pero
+// cualquiera puede manipular una página. Estas reglas las aplica el servidor
+// de Google y no se pueden saltar.
+//
+// La oficina se identifica por su correo. Para dar acceso de oficina a alguien
+// más, se añade su correo a la lista de abajo y se vuelve a publicar. Ojo: la
+// misma lista está en `src/auth.js` y las dos deben coincidir — esa decide qué
+// pantallas se ven, esta decide qué datos se pueden leer.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null && request.auth.token.email_verified != false;
+    }
+
+    function correo() {
+      return request.auth.token.email.lower();
+    }
+
+    function esOficina() {
+      return autenticado() && correo() in [
+        'elnisong@gmail.com'
+      ];
+    }
+
+    // Lista explícita, no "cualquiera que no sea oficina": si bastara con estar
+    // autenticado, alguien que se registrase por su cuenta entraría como
+    // técnico y podría leer las tareas y los clientes. Aquí, quien no esté
+    // nombrado no tiene nada, aunque tenga una cuenta válida.
+    function esTecnico() {
+      return autenticado() && correo() in [
+        'tecnico1@vicfan.app',
+        'tecnico2@vicfan.app'
+      ];
+    }
+
+    // Campos que un técnico puede tocar de una tarea. No puede cambiar el
+    // cliente, la fecha, el precio ni si está publicada: eso es de oficina.
+    function soloCamposDeCampo() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['estado', 'fotos', 'observaciones', 'historial', 'cierre', 'cierresPrevios']);
+    }
+
+    // ── Tareas ────────────────────────────────────────────────────────────────
+    // El técnico solo ve las publicadas, y solo puede documentar su trabajo.
+    match /vicfan_tareas/{id} {
+      allow read:   if esOficina() || (esTecnico() && resource.data.publicada == true);
+      allow create, delete: if esOficina();
+      allow update: if esOficina()
+                    || (esTecnico() && resource.data.publicada == true && soloCamposDeCampo());
+    }
+
+    // ── Fotos ─────────────────────────────────────────────────────────────────
+    // Se leen y se suben desde ambos lados. Borrar una foto ajena es de
+    // oficina: la del técnico es la evidencia de lo que entregó.
+    match /vicfan_fotos/{id} {
+      allow read:   if autenticado();
+      allow create: if autenticado();
+      allow update: if esOficina() || resource.data.autor == request.auth.token.name;
+      allow delete: if esOficina() || resource.data.autor == request.auth.token.name;
+    }
+
+    // ── Dinero: solo la oficina ───────────────────────────────────────────────
+    // Un técnico no tiene por qué saber cuánto se cobró por una instalación.
+    match /vicfan_cotizaciones/{id} { allow read, write: if esOficina(); }
+    match /vicfan_ventas/{id}       { allow read, write: if esOficina(); }
+    match /vicfan_empresa/{id}      { allow read, write: if esOficina(); }
+
+    // ── Datos de apoyo ────────────────────────────────────────────────────────
+    // El técnico necesita leer a qué cliente va y qué equipo lleva, pero no
+    // puede modificarlos.
+    match /vicfan_clientes/{id}   { allow read: if autenticado(); allow write: if esOficina(); }
+    match /vicfan_inventario/{id} { allow read: if autenticado(); allow write: if esOficina(); }
+    match /vicfan_repuestos/{id}  { allow read: if autenticado(); allow write: if esOficina(); }
+    match /vicfan_garantias/{id}  { allow read: if autenticado(); allow write: if esOficina(); }
+    match /vicfan_tecnicos/{id}   { allow read: if autenticado(); allow write: if esOficina(); }
+
+    // Nada más existe. Lo que no esté nombrado aquí queda denegado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

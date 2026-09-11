@@ -1,106 +1,87 @@
 import { useState } from "react";
-import { NAVY, ORANGE, RED, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB, ACENTOS } from "./ui.jsx";
+import { NAVY, ORANGE, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB } from "./ui.jsx";
+import { entrar, mensajeDeError } from "./auth.js";
 
-// Identificación por PIN, no cuentas con correo y contraseña.
+// Pantalla de acceso.
 //
-// El objetivo aquí es RESPONSABILIDAD (que quede registrado quién cerró cada
-// tarea), no seguridad contra un atacante: un técnico subido en una escalera
-// no va a escribir un correo y una contraseña larga en el teléfono. Cuando
-// haga falta seguridad real —o si algún día hay rotación de personal— esto se
-// cambia por Firebase Auth sin tocar el resto de la app.
+// Se entra una sola vez por dispositivo: la sesión queda guardada aunque se
+// cierre el navegador o se reinicie el móvil. Por eso compensa pedir correo y
+// contraseña en vez de un PIN — la fricción se paga una vez y a cambio el
+// servidor sabe de verdad quién es cada quien.
 
-export const PIN_ADMIN_POR_DEFECTO = "9999";
+const campo = {
+  width: "100%", background: BG_CARD, border: `1.5px solid ${BORDER}`, borderRadius: 12,
+  color: TEXT_MAIN, padding: "14px 16px", fontSize: 16, outline: "none",
+  boxSizing: "border-box", fontFamily: "inherit", marginBottom: 12,
+};
 
-function Tecla({ children, onClick, tenue }) {
-  return (
-    <button onClick={onClick}
-      style={{ background: tenue ? "transparent" : BG_CARD, border: `1.5px solid ${tenue ? "transparent" : BORDER}`, borderRadius: 16, padding: "18px 0", fontSize: tenue ? 20 : 26, fontWeight: 700, color: tenue ? TEXT_SUB : TEXT_MAIN, cursor: "pointer", fontFamily: "inherit" }}>
-      {children}
-    </button>
-  );
-}
+export default function PantallaLogin() {
+  const [correo, setCorreo] = useState("");
+  const [clave, setClave] = useState("");
+  const [verClave, setVerClave] = useState(false);
+  const [error, setError] = useState("");
+  const [entrando, setEntrando] = useState(false);
 
-export default function PantallaLogin({ tecnicos, pinAdmin, onEntrar }) {
-  const [quien, setQuien] = useState(null);   // null | "admin" | id de técnico
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState(false);
-
-  const identidades = [
-    { id: "admin", nombre: "Oficina", detalle: "Acceso completo", color: NAVY, icono: "🏢" },
-    ...tecnicos.map(t => ({ id: t.id, nombre: t.nombre, detalle: t.especialidad || "Técnico", color: ACENTOS.tareas, icono: "👷", pin: t.pin })),
-  ];
-
-  const elegida = identidades.find(i => i.id === quien);
-
-  const teclear = d => {
-    if (pin.length >= 4) return;
-    const nuevo = pin + d;
-    setPin(nuevo);
-    setError(false);
-    if (nuevo.length === 4) setTimeout(() => verificar(nuevo), 120);
-  };
-
-  const verificar = valor => {
-    const esperado = quien === "admin" ? (pinAdmin || PIN_ADMIN_POR_DEFECTO) : elegida?.pin;
-    if (valor === esperado) {
-      onEntrar(quien === "admin"
-        ? { rol: "admin", tecnicoId: null, nombre: "Oficina" }
-        : { rol: "tecnico", tecnicoId: quien, nombre: elegida.nombre });
-    } else {
-      setError(true);
-      setPin("");
+  const enviar = async e => {
+    e.preventDefault();
+    if (!correo.trim() || !clave) return;
+    setEntrando(true);
+    setError("");
+    try {
+      await entrar(correo, clave);
+      // No hace falta hacer nada más: el estado de sesión avisa a la app.
+    } catch (err) {
+      setError(mensajeDeError(err?.code));
+      setEntrando(false);
     }
   };
 
-  const volver = () => { setQuien(null); setPin(""); setError(false); };
-
   return (
     <div style={{ minHeight: "100vh", background: NAVY, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Inter', 'Helvetica Neue', sans-serif" }}>
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
+      <div style={{ textAlign: "center", marginBottom: 30 }}>
         <h1 style={{ color: "#fff", margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: "-1.5px" }}>⚡ VICFAN</h1>
         <p style={{ color: "#94b4d4", margin: "2px 0 0", fontSize: 13 }}>Generadores GENERAC</p>
       </div>
 
-      <div style={{ width: "100%", maxWidth: 340 }}>
-        {!quien ? (
-          <>
-            <p style={{ color: "#94b4d4", fontSize: 13, fontWeight: 700, textTransform: "uppercase", marginBottom: 12, textAlign: "center" }}>¿Quién eres?</p>
-            {identidades.map(i => (
-              <button key={i.id} onClick={() => setQuien(i.id)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, background: BG_CARD, border: `1px solid ${BORDER}`, borderLeft: `4px solid ${i.color}`, borderRadius: 14, padding: "16px 18px", marginBottom: 10, cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
-                <span style={{ fontSize: 26 }}>{i.icono}</span>
-                <span style={{ flex: 1 }}>
-                  <span style={{ display: "block", fontWeight: 800, fontSize: 16, color: TEXT_MAIN }}>{i.nombre}</span>
-                  <span style={{ display: "block", fontSize: 12, color: TEXT_SUB }}>{i.detalle}</span>
-                </span>
-                <span style={{ color: TEXT_SUB, fontSize: 20 }}>›</span>
-              </button>
-            ))}
-          </>
-        ) : (
-          <>
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <p style={{ color: "#fff", fontSize: 18, fontWeight: 800, margin: "0 0 2px" }}>{elegida.icono} {elegida.nombre}</p>
-              <p style={{ color: error ? "#ff9a9a" : "#94b4d4", fontSize: 13, margin: 0 }}>
-                {error ? "PIN incorrecto, intenta de nuevo" : "Ingresa tu PIN"}
-              </p>
-            </div>
+      <form onSubmit={enviar} style={{ width: "100%", maxWidth: 340 }}>
+        <label style={{ display: "block", color: "#94b4d4", fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Correo</label>
+        <input
+          type="email" inputMode="email" autoComplete="username" autoCapitalize="none" autoCorrect="off"
+          value={correo} onChange={e => setCorreo(e.target.value)}
+          placeholder="tucorreo@ejemplo.com" style={campo} disabled={entrando}
+        />
 
-            <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 26 }}>
-              {[0, 1, 2, 3].map(i => (
-                <span key={i} style={{ width: 16, height: 16, borderRadius: "50%", background: i < pin.length ? (error ? RED : ORANGE) : "#ffffff22", border: `2px solid ${i < pin.length ? (error ? RED : ORANGE) : "#ffffff33"}`, transition: "background 0.15s" }} />
-              ))}
-            </div>
+        <label style={{ display: "block", color: "#94b4d4", fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Contraseña</label>
+        <div style={{ position: "relative" }}>
+          <input
+            type={verClave ? "text" : "password"} autoComplete="current-password"
+            value={clave} onChange={e => setClave(e.target.value)}
+            placeholder="••••••••" style={{ ...campo, paddingRight: 74 }} disabled={entrando}
+          />
+          {/* En un móvil, con una mano y guantes, escribir a ciegas es la
+              primera causa de "no me deja entrar". */}
+          <button type="button" onClick={() => setVerClave(v => !v)}
+            style={{ position: "absolute", right: 12, top: 13, background: "none", border: "none", color: TEXT_SUB, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            {verClave ? "Ocultar" : "Ver"}
+          </button>
+        </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(d => <Tecla key={d} onClick={() => teclear(d)}>{d}</Tecla>)}
-              <Tecla tenue onClick={volver}>‹</Tecla>
-              <Tecla onClick={() => teclear("0")}>0</Tecla>
-              <Tecla tenue onClick={() => { setPin(p => p.slice(0, -1)); setError(false); }}>⌫</Tecla>
-            </div>
-          </>
+        {error && (
+          <p style={{ background: "#ffffff18", border: "1px solid #ff9a9a55", borderRadius: 10, color: "#ff9a9a", fontSize: 13, fontWeight: 600, padding: "10px 12px", margin: "2px 0 12px" }}>
+            {error}
+          </p>
         )}
-      </div>
+
+        <button type="submit" disabled={entrando || !correo.trim() || !clave}
+          style={{ width: "100%", background: entrando ? "#ffffff33" : ORANGE, border: "none", borderRadius: 50, color: "#fff", padding: "15px", fontSize: 16, fontWeight: 700, cursor: entrando ? "default" : "pointer", fontFamily: "inherit" }}>
+          {entrando ? "Entrando…" : "Entrar"}
+        </button>
+      </form>
+
+      <p style={{ color: "#94b4d4", fontSize: 12, marginTop: 24, textAlign: "center", maxWidth: 300, lineHeight: 1.6 }}>
+        Solo tienes que entrar una vez en este teléfono.<br />
+        ¿No tienes cuenta? Pídesela a la oficina.
+      </p>
     </div>
   );
 }

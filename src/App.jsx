@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useColeccion } from "./datos.js";
 import {
   NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB,
@@ -8,7 +8,8 @@ import {
 import { prepararImagen, prepararLogo } from "./imagenes.js";
 import ModuloTareas, { tareaVacia } from "./modules/Tareas.jsx";
 import ModuloCotizaciones, { EMPRESA_POR_DEFECTO } from "./modules/Cotizaciones.jsx";
-import PantallaLogin, { PIN_ADMIN_POR_DEFECTO } from "./sesion.jsx";
+import PantallaLogin from "./sesion.jsx";
+import { useSesion, salir as cerrarSesion } from "./auth.js";
 import { useNuevaVersion } from "./version.js";
 
 const TABS = [
@@ -275,12 +276,10 @@ function ModuloGarantias({ garantias, clientes }) {
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
-function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, cargarDemo, pinAdmin, setPinAdmin, empresa, setEmpresa }) {
+function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, cargarDemo, empresa, setEmpresa, correo }) {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({});
   const [confirmDemo, setConfirmDemo] = useState(false);
-  const [editandoPin, setEditandoPin] = useState(false);
-  const [pinNuevo, setPinNuevo] = useState("");
   const [editandoEmpresa, setEditandoEmpresa] = useState(false);
   const [borradorEmpresa, setBorradorEmpresa] = useState({});
   const [copia, setCopia] = useState(null);   // backup leído, a la espera de confirmación
@@ -306,15 +305,8 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, car
   };
   const guardar = () => {
     if (!form.nombre?.trim()) return;
-    if (!/^\d{4}$/.test(form.pin || "")) { alert("El PIN debe tener exactamente 4 dígitos."); return; }
     setTecnicos(p => p.find(x => x.id === form.id) ? p.map(x => x.id === form.id ? form : x) : [...p, form]);
     setModal(false);
-  };
-  const guardarPinAdmin = () => {
-    if (!/^\d{4}$/.test(pinNuevo)) { alert("El PIN debe tener exactamente 4 dígitos."); return; }
-    setPinAdmin(pinNuevo);
-    setEditandoPin(false);
-    setPinNuevo("");
   };
   return (
     <div>
@@ -382,39 +374,26 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, car
         )}
       </Card>
 
-      <h3 style={{ margin: "20px 0 10px", fontSize: 15 }}>🔑 Acceso de la oficina</h3>
+      <h3 style={{ margin: "20px 0 10px", fontSize: 15 }}>🔑 Tu sesión</h3>
       <Card>
-        {!editandoPin ? (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <p style={{ margin: "0 0 2px", fontWeight: 700 }}>PIN de Oficina</p>
-              <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB }}>
-                {pinAdmin === PIN_ADMIN_POR_DEFECTO ? "⚠️ Sigue siendo el PIN por defecto" : "•••• configurado"}
-              </p>
-            </div>
-            <Btn onClick={() => { setEditandoPin(true); setPinNuevo(""); }} color={ac} outline small>Cambiar</Btn>
-          </div>
-        ) : (
-          <>
-            <Inp label="Nuevo PIN (4 dígitos)" value={pinNuevo} onChange={v => setPinNuevo(v.replace(/\D/g, "").slice(0, 4))} type="tel" placeholder="••••" />
-            <div style={{ display: "flex", gap: 8 }}>
-              <Btn onClick={guardarPinAdmin} color={ac} small full>Guardar</Btn>
-              <Btn onClick={() => setEditandoPin(false)} color={TEXT_SUB} outline small full>Cancelar</Btn>
-            </div>
-          </>
-        )}
+        <p style={{ margin: "0 0 2px", fontWeight: 700 }}>{correo}</p>
+        <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB }}>Acceso de oficina · sesión verificada por Firebase</p>
+        <p style={{ margin: "10px 0 0", fontSize: 12, color: TEXT_SUB, lineHeight: 1.6 }}>
+          Las cuentas de los técnicos se crean desde la consola de Firebase, en
+          Authentication. Cualquier cuenta que no sea de oficina entra como técnico.
+        </p>
       </Card>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "20px 0 12px" }}>
         <h3 style={{ margin: 0, fontSize: 15 }}>👷 Técnicos</h3>
-        <Btn onClick={() => { setForm({ id: uid(), nombre: "", telefono: "", especialidad: "Instalación", pin: "" }); setModal(true); }} color={ac} small>+ Nuevo</Btn>
+        <Btn onClick={() => { setForm({ id: uid(), nombre: "", telefono: "", especialidad: "Instalación" }); setModal(true); }} color={ac} small>+ Nuevo</Btn>
       </div>
       {tecnicos.map(t => (
         <Card key={t.id}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <p style={{ margin: "0 0 2px", fontWeight: 700 }}>{t.nombre}</p>
-              <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB }}>{t.telefono ? `📞 ${t.telefono} · ` : ""}{t.especialidad} · 🔑 PIN {t.pin || "sin asignar"}</p>
+              <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB }}>{t.telefono ? `📞 ${t.telefono} · ` : ""}{t.especialidad}</p>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               <Btn onClick={() => { setForm({ ...t }); setModal(true); }} color={ac} outline small>✏️</Btn>
@@ -426,10 +405,9 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, car
       {modal && (
         <Modal onClose={() => setModal(false)}>
           <h3 style={{ margin: "0 0 20px", color: ac }}>Técnico</h3>
-          <Inp label="Nombre" value={form.nombre || ""} onChange={v => setForm(f => ({ ...f, nombre: v }))} placeholder="Como aparecerá al iniciar sesión" />
+          <Inp label="Nombre" value={form.nombre || ""} onChange={v => setForm(f => ({ ...f, nombre: v }))} />
           <Inp label="Teléfono" value={form.telefono || ""} onChange={v => setForm(f => ({ ...f, telefono: v }))} />
           <Sel label="Especialidad" value={form.especialidad || "Instalación"} onChange={v => setForm(f => ({ ...f, especialidad: v }))} options={["Instalación", "Mantenimiento", "Reparación", "Todos"].map(t => ({ value: t, label: t }))} />
-          <Inp label="PIN de acceso (4 dígitos)" value={form.pin || ""} onChange={v => setForm(f => ({ ...f, pin: v.replace(/\D/g, "").slice(0, 4) }))} type="tel" placeholder="1234" />
           <div style={{ display: "flex", gap: 10 }}><Btn onClick={guardar} color={ac} full>Guardar</Btn><Btn onClick={() => setModal(false)} color={TEXT_SUB} outline full>Cancelar</Btn></div>
         </Modal>
       )}
@@ -482,28 +460,29 @@ export default function App() {
   const [tab, setTab]                   = useState("inicio");
   // Cada lista es un documento por registro en Firestore (ver datos.js). El
   // arranque siempre es local, así que la app abre y funciona sin red.
-  const [clientes, setClientes]         = useColeccion("clientes", CLIENTES_DEMO);
-  const [cotizaciones, setCotizaciones] = useColeccion("cotizaciones", COTIZACIONES_DEMO);
-  const [ventas, setVentas]             = useColeccion("ventas", VENTAS_DEMO);
-  const [tareas, setTareas]             = useColeccion("tareas", cargarTareas);
-  const [inventario, setInventario]     = useColeccion("inventario", MODELOS_DEMO);
-  const [repuestos, setRepuestos]       = useColeccion("repuestos", REPUESTOS_DEMO);
-  const [garantias, setGarantias]       = useColeccion("garantias", GARANTIAS_DEMO);
-  const [tecnicos, setTecnicos]         = useColeccion("tecnicos", TECNICOS_DEMO);
+  // Las reglas le niegan a un técnico las colecciones de dinero. Si la app se
+  // suscribiera igualmente, solo conseguiría errores: no se conecta siquiera.
+  const { cargando: cargandoSesion, sesion } = useSesion();
+  const conectado = !!sesion;
+  const esOficina = sesion?.rol === "admin";
+
+  const [clientes, setClientes]         = useColeccion("clientes", CLIENTES_DEMO, conectado);
+  const [cotizaciones, setCotizaciones] = useColeccion("cotizaciones", COTIZACIONES_DEMO, esOficina);
+  const [ventas, setVentas]             = useColeccion("ventas", VENTAS_DEMO, esOficina);
+  const [tareas, setTareas]             = useColeccion("tareas", cargarTareas, conectado);
+  const [inventario, setInventario]     = useColeccion("inventario", MODELOS_DEMO, conectado);
+  const [repuestos, setRepuestos]       = useColeccion("repuestos", REPUESTOS_DEMO, conectado);
+  const [garantias, setGarantias]       = useColeccion("garantias", GARANTIAS_DEMO, conectado);
+  const [tecnicos, setTecnicos]         = useColeccion("tecnicos", TECNICOS_DEMO, conectado);
   // Membrete del presupuesto: una sola ficha, pero se sincroniza igual que el
   // resto para que ambos dispositivos emitan con los mismos datos.
-  const [empresaLista, setEmpresaLista] = useColeccion("empresa", [EMPRESA_POR_DEFECTO]);
+  const [empresaLista, setEmpresaLista] = useColeccion("empresa", [EMPRESA_POR_DEFECTO], esOficina);
   const empresa = empresaLista[0] || EMPRESA_POR_DEFECTO;
 
-  // La sesión y el PIN de la oficina son de este dispositivo: no se sincronizan.
-  const [pinAdmin, setPinAdmin] = useState(() => cargarLS("vf_pin_admin", PIN_ADMIN_POR_DEFECTO));
-  const [sesion, setSesion]     = useState(() => cargarLS("vf_sesion", null));
 
   const hayVersionNueva = useNuevaVersion();
 
-  const guardarLocal = (clave, valor) => { try { localStorage.setItem(clave, JSON.stringify(valor)); } catch {} };
-  useEffect(() => { guardarLocal("vf_sesion", sesion); }, [JSON.stringify(sesion)]);
-  useEffect(() => { guardarLocal("vf_pin_admin", pinAdmin); }, [pinAdmin]);
+
 
   const cargarDemo = () => {
     setClientes(CLIENTES_DEMO); setCotizaciones(COTIZACIONES_DEMO); setVentas(VENTAS_DEMO);
@@ -574,10 +553,15 @@ export default function App() {
     a.click();
   };
 
-  if (!sesion) return <PantallaLogin tecnicos={tecnicos} pinAdmin={pinAdmin} onEntrar={setSesion} />;
+  // Mientras Firebase recuerda si ya había sesión, no se enseña nada: si no,
+  // parpadearía la pantalla de acceso cada vez que se abre la app.
+  if (cargandoSesion) {
+    return <div style={{ minHeight: "100vh", background: NAVY, display: "grid", placeItems: "center", color: "#94b4d4", fontFamily: "'Inter', sans-serif", fontSize: 14 }}>Cargando…</div>;
+  }
+  if (!sesion) return <PantallaLogin />;
 
   const esTecnico = sesion.rol === "tecnico";
-  const salir = () => { setSesion(null); setTab("inicio"); };
+  const salir = () => { cerrarSesion().catch(() => {}); setTab("inicio"); };
 
   const abierta = t => t.estado === "Programada" || t.estado === "En proceso";
   // Un técnico solo cuenta lo suyo; la oficina cuenta todo.
@@ -642,8 +626,8 @@ export default function App() {
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
-        {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos} cargarDemo={cargarDemo} pinAdmin={pinAdmin} setPinAdmin={setPinAdmin}
-          empresa={empresa} setEmpresa={d => setEmpresaLista([d])} />}
+        {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos} cargarDemo={cargarDemo}
+          empresa={empresa} setEmpresa={d => setEmpresaLista([d])} correo={sesion.correo} />}
       </div>
 
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: NAVY, zIndex: 50, boxShadow: "0 -2px 12px #0003" }}>
