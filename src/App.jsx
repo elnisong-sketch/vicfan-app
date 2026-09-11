@@ -12,6 +12,7 @@ import PantallaLogin from "./sesion.jsx";
 import { useSesion, salir as cerrarSesion } from "./auth.js";
 import Usuarios from "./modules/Usuarios.jsx";
 import { useNuevaVersion } from "./version.js";
+import AvisoInstalar from "./instalar.jsx";
 
 const TABS = [
   { id: "tareas",       icon: "📅", label: "Tareas" },
@@ -619,6 +620,7 @@ export default function App() {
       <div style={{ background: BG_APP, minHeight: "100vh", fontFamily: "'Inter', 'Helvetica Neue', sans-serif", color: TEXT_MAIN }}>
         <Cabecera />
         <div className="main-content" style={{ maxWidth: 760, margin: "0 auto", paddingBottom: 40 }}>
+          <AvisoInstalar />
           <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} tecnicos={tecnicos} sesion={sesion} />
         </div>
       </div>
@@ -631,7 +633,7 @@ export default function App() {
       <Cabecera />
 
       <div className="main-content" style={{ maxWidth: 760, margin: "0 auto" }}>
-        {tab === "inicio"       && <ModuloBienvenida setTab={setTab} stats={stats} />}
+        {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} /></>}
         {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} tecnicos={tecnicos} sesion={sesion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion} />}
