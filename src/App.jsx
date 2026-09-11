@@ -10,6 +10,7 @@ import ModuloTareas, { tareaVacia } from "./modules/Tareas.jsx";
 import ModuloCotizaciones, { EMPRESA_POR_DEFECTO } from "./modules/Cotizaciones.jsx";
 import PantallaLogin from "./sesion.jsx";
 import { useSesion, salir as cerrarSesion } from "./auth.js";
+import Usuarios from "./modules/Usuarios.jsx";
 import { useNuevaVersion } from "./version.js";
 
 const TABS = [
@@ -374,15 +375,7 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, car
         )}
       </Card>
 
-      <h3 style={{ margin: "20px 0 10px", fontSize: 15 }}>🔑 Tu sesión</h3>
-      <Card>
-        <p style={{ margin: "0 0 2px", fontWeight: 700 }}>{correo}</p>
-        <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB }}>Acceso de oficina · sesión verificada por Firebase</p>
-        <p style={{ margin: "10px 0 0", fontSize: 12, color: TEXT_SUB, lineHeight: 1.6 }}>
-          Las cuentas de los técnicos se crean desde la consola de Firebase, en
-          Authentication. Cualquier cuenta que no sea de oficina entra como técnico.
-        </p>
-      </Card>
+      <Usuarios correoPropio={correo} />
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "20px 0 12px" }}>
         <h3 style={{ margin: 0, fontSize: 15 }}>👷 Técnicos</h3>
@@ -462,7 +455,7 @@ export default function App() {
   // arranque siempre es local, así que la app abre y funciona sin red.
   // Las reglas le niegan a un técnico las colecciones de dinero. Si la app se
   // suscribiera igualmente, solo conseguiría errores: no se conecta siquiera.
-  const { cargando: cargandoSesion, sesion } = useSesion();
+  const { cargando: cargandoSesion, sesion, sinAcceso } = useSesion();
   const conectado = !!sesion;
   const esOficina = sesion?.rol === "admin";
 
@@ -558,6 +551,25 @@ export default function App() {
   if (cargandoSesion) {
     return <div style={{ minHeight: "100vh", background: NAVY, display: "grid", placeItems: "center", color: "#94b4d4", fontFamily: "'Inter', sans-serif", fontSize: 14 }}>Cargando…</div>;
   }
+  // Cuenta valida pero sin permiso asignado. Pasa si alguien se registra por su
+  // cuenta, o si la oficina le retiro el acceso mientras estaba dentro.
+  if (sinAcceso) {
+    return (
+      <div style={{ minHeight: "100vh", background: NAVY, display: "grid", placeItems: "center", padding: 24, fontFamily: "'Inter', sans-serif" }}>
+        <div style={{ maxWidth: 320, textAlign: "center" }}>
+          <p style={{ color: "#fff", fontSize: 18, fontWeight: 800, margin: "0 0 8px" }}>Sin acceso</p>
+          <p style={{ color: "#94b4d4", fontSize: 14, lineHeight: 1.6, margin: "0 0 20px" }}>
+            Tu cuenta existe, pero la oficina todavía no te ha dado permiso para entrar.
+          </p>
+          <button onClick={() => cerrarSesion()}
+            style={{ background: "#ffffff22", border: "none", borderRadius: 50, color: "#fff", padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            Salir
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!sesion) return <PantallaLogin />;
 
   const esTecnico = sesion.rol === "tecnico";

@@ -8,7 +8,7 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 // Esta configuración no es un secreto: viaja dentro del JavaScript que se
 // descarga al abrir la web. Lo que protege los datos son las Reglas de
 // Firestore, no esta clave.
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyAzV_N60yez_lbv13uTqdch9dqwD2Ar_Vo",
   authDomain: "vicfan-d9467.firebaseapp.com",
   projectId: "vicfan-d9467",

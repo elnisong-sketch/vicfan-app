@@ -7,10 +7,13 @@ rules_version = '2';
 // cualquiera puede manipular una página. Estas reglas las aplica el servidor
 // de Google y no se pueden saltar.
 //
-// La oficina se identifica por su correo. Para dar acceso de oficina a alguien
-// más, se añade su correo a la lista de abajo y se vuelve a publicar. Ojo: la
-// misma lista está en `src/auth.js` y las dos deben coincidir — esa decide qué
-// pantallas se ven, esta decide qué datos se pueden leer.
+// Quien puede hacer que NO esta escrito aqui, sino en la coleccion
+// `vicfan_acceso`: un documento por persona, con el correo de identificador y
+// su rol dentro. Asi la oficina da de alta a un tecnico nuevo desde la app, sin
+// que nadie tenga que volver a tocar estas reglas.
+//
+// Tener cuenta de Firebase no basta: sin documento de acceso no se lee nada.
+// Por eso da igual que alguien se registre por su cuenta.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -23,22 +26,20 @@ service cloud.firestore {
       return request.auth.token.email.lower();
     }
 
-    function esOficina() {
-      return autenticado() && correo() in [
-        'elnisong@gmail.com'
-      ];
+    function rutaAcceso() {
+      return /databases/$(database)/documents/vicfan_acceso/$(correo());
     }
 
-    // Lista explícita, no "cualquiera que no sea oficina": si bastara con estar
-    // autenticado, alguien que se registrase por su cuenta entraría como
-    // técnico y podría leer las tareas y los clientes. Aquí, quien no esté
-    // nombrado no tiene nada, aunque tenga una cuenta válida.
-    function esTecnico() {
-      return autenticado() && correo() in [
-        'tecnico1@vicfan.app',
-        'tecnico2@vicfan.app'
-      ];
+    function tieneAcceso() {
+      return autenticado() && exists(rutaAcceso());
     }
+
+    function rol() {
+      return get(rutaAcceso()).data.rol;
+    }
+
+    function esOficina() { return tieneAcceso() && rol() == 'admin'; }
+    function esTecnico() { return tieneAcceso() && rol() == 'tecnico'; }
 
     // Campos que un técnico puede tocar de una tarea. No puede cambiar el
     // cliente, la fecha, el precio ni si está publicada: eso es de oficina.
@@ -80,6 +81,16 @@ service cloud.firestore {
     match /vicfan_repuestos/{id}  { allow read: if autenticado(); allow write: if esOficina(); }
     match /vicfan_garantias/{id}  { allow read: if autenticado(); allow write: if esOficina(); }
     match /vicfan_tecnicos/{id}   { allow read: if autenticado(); allow write: if esOficina(); }
+
+    // ── Quien tiene acceso ────────────────────────────────────────────────────
+    // Cada uno puede leer el suyo para saber que rol tiene. Repartir accesos es
+    // solo de oficina, y ademas no puede quitarse a si misma el suyo, que seria
+    // la forma mas facil de dejar el sistema sin administrador.
+    match /vicfan_acceso/{id} {
+      allow read:   if autenticado() && (id == correo() || esOficina());
+      allow create, update: if esOficina();
+      allow delete: if esOficina() && id != correo();
+    }
 
     // Nada más existe. Lo que no esté nombrado aquí queda denegado.
     match /{document=**} {
