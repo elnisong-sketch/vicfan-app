@@ -63,7 +63,7 @@ const duracionEnDias = t => t.duracionDias ?? 1;
 const textoDuracion = t => { const d = duracionEnDias(t); return `${d} día${d === 1 ? "" : "s"}`; };
 
 // ── GALERÍA DE FOTOS ──────────────────────────────────────────────────────────
-function Fotos({ tareaId, fotos, onCambio, soloLectura }) {
+function Fotos({ tareaId, fotos, onCambio, soloLectura, autor }) {
   const [tipo, setTipo] = useState("despues");
   const [urls, setUrls] = useState({});
   const [cargando, setCargando] = useState(false);
@@ -97,12 +97,16 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura }) {
     setCargando(true);
     try {
       const nuevas = [];
+      const cuando = new Date().toISOString();
       for (const file of archivos) {
         const id = uid();
-        await guardarFoto({ id, tareaId, tipo, file });
-        nuevas.push({ id, tipo });
+        await guardarFoto({ id, tareaId, tipo, autor, file });
+        nuevas.push({ id, tipo, autor, cuando });
       }
-      onCambio([...fotos, ...nuevas]);
+      const etiqueta = TIPOS_FOTO.find(t => t.id === tipo)?.label || tipo;
+      onCambio([...fotos, ...nuevas], {
+        accion: `${nuevas.length} foto${nuevas.length === 1 ? "" : "s"} añadida${nuevas.length === 1 ? "" : "s"} (${etiqueta})`,
+      });
     } catch {
       alert("No se pudo guardar la foto. Revisa el espacio disponible en el teléfono.");
     } finally {
@@ -113,7 +117,7 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura }) {
 
   const quitar = async id => {
     await borrarFoto(id).catch(() => {});
-    onCambio(fotos.filter(f => f.id !== id));
+    onCambio(fotos.filter(f => f.id !== id), { accion: "Foto eliminada" });
   };
 
   return (
@@ -135,7 +139,7 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura }) {
           {fotos.map(f => (
             <div key={f.id} style={{ position: "relative", aspectRatio: "1", borderRadius: 10, overflow: "hidden", border: `1px solid ${BORDER}`, background: BG_INPUT }}>
               {urls[f.id]
-                ? <img src={urls[f.id]} alt={f.tipo} onClick={() => setAmpliada(urls[f.id])} style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }} />
+                ? <img src={urls[f.id]} alt={f.tipo} onClick={() => setAmpliada({ url: urls[f.id], tipo: f.tipo, autor: f.autor, cuando: f.cuando })} style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }} />
                 : <div style={{ display: "grid", placeItems: "center", height: "100%", fontSize: 11, color: TEXT_SUB }}>…</div>}
               <span style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "#000000aa", color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 5px", textAlign: "center" }}>
                 {TIPOS_FOTO.find(t => t.id === f.tipo)?.label || f.tipo}
@@ -149,8 +153,13 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura }) {
       )}
 
       {ampliada && (
-        <div onClick={() => setAmpliada(null)} style={{ position: "fixed", inset: 0, background: "#000000ee", zIndex: 300, display: "grid", placeItems: "center", padding: 16 }}>
-          <img src={ampliada} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+        <div onClick={() => setAmpliada(null)} style={{ position: "fixed", inset: 0, background: "#000000ee", zIndex: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: 16 }}>
+          <img src={ampliada.url} alt="" style={{ maxWidth: "100%", maxHeight: "82%", objectFit: "contain" }} />
+          <p style={{ margin: 0, color: "#fff", fontSize: 13, textAlign: "center" }}>
+            {TIPOS_FOTO.find(t => t.id === ampliada.tipo)?.label || ampliada.tipo}
+            {ampliada.autor ? ` · ${ampliada.autor}` : ""}
+            {ampliada.cuando ? ` · ${horaLegible(ampliada.cuando)}` : ""}
+          </p>
         </div>
       )}
     </div>
@@ -283,7 +292,7 @@ function ModalCierre({ tarea, tecnicos, sesion, onFotos, onConfirmar, onCancelar
       )}
       <Area label="Trabajo realizado" value={trabajo} onChange={setTrabajo} filas={4} placeholder="Describe qué se hizo, qué se encontró, qué quedó pendiente…" />
 
-      <Fotos tareaId={tarea.id} fotos={tarea.fotos || []} onCambio={onFotos} />
+      <Fotos tareaId={tarea.id} fotos={tarea.fotos || []} onCambio={onFotos} autor={sesion?.nombre || "Oficina"} />
 
       {/* El técnico nunca ve ni toca importes: el costo lo lleva la oficina. */}
       {!esTecnico && <Inp label="Costo final ($)" type="number" value={costoFinal} onChange={setCostoFinal} />}
@@ -312,7 +321,21 @@ function GuardarEnLinea({ fotos }) {
   const clave = ids.join(",");
 
   const revisar = () => contarPendientes(ids).then(setPendientes).catch(() => {});
-  useEffect(() => { revisar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clave]);
+
+  // La subida ocurre en segundo plano al tomar la foto. Sin volver a mirar, el
+  // aviso se quedaba en "sin subir" cuando ya estaba arriba, y un indicador que
+  // miente es peor que no tenerlo. Se comprueba de nuevo mientras queden.
+  useEffect(() => {
+    revisar();
+    const id = setInterval(() => {
+      contarPendientes(ids).then(n => {
+        setPendientes(n);
+        if (n === 0) clearInterval(id);
+      }).catch(() => {});
+    }, 2500);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clave]);
 
   // Al recuperar la conexión se reintenta solo, sin esperar a que pulse nada.
   useEffect(() => {
@@ -468,7 +491,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
           el técnico necesita documentar el "antes" apenas llega al sitio. */}
       {/* Una vez cerrada la tarea, el técnico ya no puede tocar las fotos: son
           la evidencia de lo que entregó. La oficina sí conserva el control. */}
-      <Fotos tareaId={tarea.id} fotos={tarea.fotos || []} onCambio={onFotos}
+      <Fotos tareaId={tarea.id} fotos={tarea.fotos || []} onCambio={onFotos} autor={sesion?.nombre || "Oficina"}
         soloLectura={tarea.estado === "Cancelada" || (esTecnico && !estaAbierta(tarea))} />
 
       <Observaciones notas={tarea.observaciones || []} onAgregar={onObservacion}
@@ -630,10 +653,12 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
     quienActua,
   ));
 
-  const agregarObservacion = (t, texto) => actualizar(t.id, x => ({
+  // El comentario se guarda y ademas deja huella en el historial, para que la
+  // visita se pueda leer en orden sin ir saltando entre secciones.
+  const agregarObservacion = (t, texto) => actualizar(t.id, x => registrar({
     ...x,
     observaciones: [...(x.observaciones || []), { id: uid(), texto, autor: quienActua, cuando: new Date().toISOString() }],
-  }));
+  }, "Comentario añadido", quienActua));
 
   // Reabrir no borra el cierre anterior: lo archiva. Si una instalación hubo
   // que rehacerla, tiene que quedar constancia de que se cerró una primera vez
@@ -741,7 +766,8 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
           onEditar={() => { setForm({ ...detalle }); setDetalle(null); }}
           onReprogramar={f => reprogramar(detalle, f)}
           onCancelarTarea={() => cancelarTarea(detalle)}
-          onFotos={fotos => actualizar(detalle.id, x => ({ ...x, fotos }))}
+          onFotos={(fotos, info) => actualizar(detalle.id, x =>
+            info?.accion ? registrar({ ...x, fotos }, info.accion, quienActua) : { ...x, fotos })}
           onObservacion={texto => agregarObservacion(detalle, texto)}
           onReabrir={() => reabrir(detalle)}
           onPublicar={valor => publicar(detalle, valor)}
@@ -750,7 +776,8 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
 
       {cerrando && (
         <ModalCierre tarea={tareas.find(t => t.id === cerrando.id) || cerrando} tecnicos={tecnicos} sesion={sesion}
-          onFotos={fotos => actualizar(cerrando.id, x => ({ ...x, fotos }))}
+          onFotos={(fotos, info) => actualizar(cerrando.id, x =>
+            info?.accion ? registrar({ ...x, fotos }, info.accion, quienActua) : { ...x, fotos })}
           onConfirmar={confirmarCierre} onCancelar={() => setCerrando(null)} />
       )}
     </div>

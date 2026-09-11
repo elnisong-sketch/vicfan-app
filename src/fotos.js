@@ -96,9 +96,9 @@ const dataUrlABlob = url => fetch(url).then(r => r.blob());
 // ── GUARDAR Y SUBIR ───────────────────────────────────────────────────────────
 
 /** Guarda la foto en el dispositivo e intenta subirla. Nunca falla por la red. */
-export async function guardarFoto({ id, tareaId, tipo, file }) {
+export async function guardarFoto({ id, tareaId, tipo, autor, file }) {
   const blob = await comprimirImagen(file);
-  const registro = { id, tareaId, tipo, blob, bytes: blob.size, creadaEn: new Date().toISOString(), subida: false };
+  const registro = { id, tareaId, tipo, autor: autor || "—", blob, bytes: blob.size, creadaEn: new Date().toISOString(), subida: false };
   await guardarLocal(registro);
   subirFoto(registro).catch(() => {});   // en segundo plano; si falla, queda en cola
   return registro;
@@ -110,6 +110,7 @@ async function subirFoto(registro) {
     id: registro.id,
     tareaId: registro.tareaId,
     tipo: registro.tipo,
+    autor: registro.autor || "—",
     datos,
     creadaEn: registro.creadaEn,
   });
@@ -146,7 +147,7 @@ export async function asegurarFoto(id) {
 
   const d = snap.data();
   const blob = await dataUrlABlob(d.datos);
-  await guardarLocal({ id, tareaId: d.tareaId, tipo: d.tipo, blob, bytes: blob.size, creadaEn: d.creadaEn, subida: true })
+  await guardarLocal({ id, tareaId: d.tareaId, tipo: d.tipo, autor: d.autor || "—", blob, bytes: blob.size, creadaEn: d.creadaEn, subida: true })
     .catch(() => {});
   return blob;
 }
