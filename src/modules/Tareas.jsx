@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ACENTOS, ESTADO_COLOR, PRIORIDAD_COLOR, BORDER, BG_CARD, BG_INPUT, TEXT_MAIN, TEXT_SUB, GREEN, ORANGE, RED,
   hoy, sumarDias, inicioSemana, nombreDia, diaDelMes, fechaLarga, fechaCorta, esHoy, esPasado, horaLegible,
@@ -357,13 +357,19 @@ function GuardarEnLinea({ fotos }) {
 // Se acumulan en vez de sobrescribirse: cada nota queda firmada y fechada, de
 // modo que la oficina puede leer lo que el técnico fue anotando durante el
 // trabajo sin que una nota tape a la anterior.
-function Observaciones({ notas, onAgregar, quien }) {
+function Observaciones({ notas, onAgregar, onBorrador, quien }) {
   const [texto, setTexto] = useState("");
-  const agregar = () => { if (!texto.trim()) return; onAgregar(texto.trim()); setTexto(""); };
+  const escribir = v => { setTexto(v); onBorrador?.(v); };
+  const agregar = () => { if (!texto.trim()) return; onAgregar(texto.trim()); escribir(""); };
+  const pendiente = texto.trim().length > 0;
 
   return (
     <div style={{ marginBottom: 16 }}>
       <Etiqueta>💬 Observaciones {notas.length > 0 && `(${notas.length})`}</Etiqueta>
+
+      {notas.length === 0 && (
+        <p style={{ margin: "0 0 8px", fontSize: 12.5, color: TEXT_SUB }}>Todavía no hay observaciones.</p>
+      )}
 
       {notas.map(n => (
         <div key={n.id} style={{ background: BG_INPUT, borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
@@ -372,10 +378,21 @@ function Observaciones({ notas, onAgregar, quien }) {
         </div>
       ))}
 
-      <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={2}
-        placeholder={`Escribe una observación como ${quien}…`}
-        style={{ ...estiloInput, resize: "vertical", marginBottom: 8 }} />
-      <Btn onClick={agregar} color={ac} outline small disabled={!texto.trim()}>+ Añadir observación</Btn>
+      <div style={{ marginTop: 12 }}>
+        <Etiqueta>Comentarios</Etiqueta>
+        <textarea value={texto} onChange={e => escribir(e.target.value)} rows={2}
+          placeholder={`Escribe un comentario como ${quien}…`}
+          style={{ ...estiloInput, resize: "vertical", marginBottom: 8,
+                   borderColor: pendiente ? ORANGE : BORDER }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Btn onClick={agregar} color={pendiente ? ORANGE : ac} outline={!pendiente} small disabled={!pendiente}>
+            + Añadir comentario
+          </Btn>
+          {pendiente && (
+            <span style={{ fontSize: 11.5, color: ORANGE, fontWeight: 700 }}>Sin guardar todavía</span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -388,8 +405,18 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
   const c = tarea.cierre;
   const esTecnico = sesion?.rol === "tecnico";
 
+  // Un comentario escrito y no añadido se guardaba en silencio a la basura al
+  // cerrar la ventana. Ahora se conserva: quien lo escribió quería dejarlo.
+  const borrador = useRef("");
+  const cerrarGuardando = () => {
+    const pendiente = borrador.current.trim();
+    if (pendiente) onObservacion(pendiente);
+    borrador.current = "";
+    onCerrar();
+  };
+
   return (
-    <Modal onClose={onCerrar}>
+    <Modal onClose={cerrarGuardando}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
         <h3 style={{ margin: 0, color: ac }}>{TIPO_ICONO[tarea.tipo]} {nombreCliente}</h3>
         <Badge text={tarea.estado} color={ESTADO_COLOR[tarea.estado] || TEXT_SUB} />
@@ -444,7 +471,8 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
       <Fotos tareaId={tarea.id} fotos={tarea.fotos || []} onCambio={onFotos}
         soloLectura={tarea.estado === "Cancelada" || (esTecnico && !estaAbierta(tarea))} />
 
-      <Observaciones notas={tarea.observaciones || []} onAgregar={onObservacion} quien={sesion?.nombre || "Oficina"} />
+      <Observaciones notas={tarea.observaciones || []} onAgregar={onObservacion}
+        onBorrador={v => { borrador.current = v; }} quien={sesion?.nombre || "Oficina"} />
 
       <GuardarEnLinea fotos={tarea.fotos || []} />
 
@@ -504,7 +532,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
         </div>
       )}
 
-      <Btn onClick={onCerrar} color={TEXT_SUB} outline full>Cerrar</Btn>
+      <Btn onClick={cerrarGuardando} color={TEXT_SUB} outline full>Cerrar</Btn>
     </Modal>
   );
 }
