@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   ACENTOS, ESTADO_COLOR, BORDER, BG_INPUT, TEXT_SUB, GREEN, RED,
   hoy, usd, uid,
@@ -251,120 +251,38 @@ function LineasItems({ items, onCambio, inventario, repuestos }) {
   );
 }
 
-// ── HOJA IMPRIMIBLE ───────────────────────────────────────────────────────────
-// Se genera el PDF con la impresión del propio navegador en lugar de una
-// librería: el texto sale seleccionable, no añade peso a la app, y en el móvil
-// el sistema ofrece "Guardar como PDF" para enviarlo por WhatsApp.
-function HojaImpresion({ cotizacion, cliente, empresa, inventario = [] }) {
-  if (!cotizacion) return null;
-  const e = empresa || EMPRESA_POR_DEFECTO;
-
-  // La foto se busca en el inventario al imprimir en vez de copiarla dentro de
-  // cada cotización: así una imagen no se duplica en decenas de presupuestos.
-  // Primero por id del modelo, y si la línea es antigua o se escribió a mano,
-  // por nombre sin distinguir mayúsculas ni espacios de sobra.
-  const normalizar = t => (t || "").trim().toLowerCase();
-  const fotoDe = item => {
-    const porId = item.modeloId && inventario.find(m => m.id === item.modeloId);
-    if (porId?.imagen) return porId.imagen;
-    return inventario.find(m => normalizar(m.nombre) === normalizar(item.nombre))?.imagen || null;
-  };
-
-  return (
-    <div className="hoja-impresion">
-      <div style={{ display: "flex", alignItems: "center", gap: 14, borderBottom: "2px solid #000", paddingBottom: 8, marginBottom: 14 }}>
-        {e.logo && <img src={e.logo} alt="" style={{ height: 58, maxWidth: 150, objectFit: "contain" }} />}
-        <div style={{ flex: 1, textAlign: e.logo ? "left" : "center" }}>
-          <div style={{ fontSize: 17, fontWeight: 800 }}>{e.nombre}</div>
-          <div style={{ fontSize: 11 }}>{e.rif}</div>
-          {e.eslogan && <div style={{ fontSize: 11, fontStyle: "italic" }}>{e.eslogan}</div>}
-        </div>
-      </div>
-
-      <div style={{ textAlign: "center", fontSize: 15, fontWeight: 800, marginBottom: 12 }}>
-        PRESUPUESTO Nº {numeroVisible(cotizacion)}
-      </div>
-
-      <table style={{ width: "100%", fontSize: 11.5, marginBottom: 12 }}>
-        <tbody>
-          <tr><td style={{ width: 150, fontWeight: 700 }}>FECHA DE EMISIÓN:</td><td>{cotizacion.fecha}</td></tr>
-          <tr><td style={{ fontWeight: 700 }}>NOMBRE O RAZÓN SOCIAL:</td><td>{cliente?.nombre || "—"}{cliente?.documento ? `  ${cliente.documento}` : ""}</td></tr>
-          <tr><td style={{ fontWeight: 700 }}>DIRECCIÓN:</td><td>{cliente?.direccion || "—"}</td></tr>
-          <tr><td style={{ fontWeight: 700 }}>CONDICIONES DE PAGO:</td><td>{cotizacion.condicionesPago || "—"}</td></tr>
-        </tbody>
-      </table>
-
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
-        <thead>
-          <tr>
-            <th style={{ border: "1px solid #000", padding: "5px 6px", textAlign: "left" }}>DESCRIPCIÓN</th>
-            <th style={{ border: "1px solid #000", padding: "5px 6px", width: 60 }}>CANTIDAD</th>
-            <th style={{ border: "1px solid #000", padding: "5px 6px", width: 90 }}>PRECIO UNITARIO</th>
-            <th style={{ border: "1px solid #000", padding: "5px 6px", width: 90 }}>TOTAL US.</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cotizacion.items.map(it => (
-            <tr key={it.id}>
-              <td style={{ border: "1px solid #000", padding: "5px 6px" }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  {fotoDe(it) && (
-                    <img src={fotoDe(it)} alt="" style={{ width: 68, height: 68, objectFit: "contain", flexShrink: 0 }} />
-                  )}
-                  <div>
-                    {it.nombre}
-                    {it.detalle && <div style={{ fontSize: 10.5 }}>{it.detalle}</div>}
-                  </div>
-                </div>
-              </td>
-              <td style={{ border: "1px solid #000", padding: "5px 6px", textAlign: "center" }}>{it.cantidad}</td>
-              <td style={{ border: "1px solid #000", padding: "5px 6px", textAlign: "right" }}>{usd(it.precio)}</td>
-              <td style={{ border: "1px solid #000", padding: "5px 6px", textAlign: "right" }}>{usd(it.subtotal)}</td>
-            </tr>
-          ))}
-          <tr>
-            <td colSpan={3} style={{ border: "1px solid #000", padding: "5px 6px", textAlign: "right", fontWeight: 700 }}>SUB-TOTAL:</td>
-            <td style={{ border: "1px solid #000", padding: "5px 6px", textAlign: "right" }}>{usd(cotizacion.total)}</td>
-          </tr>
-          <tr>
-            <td colSpan={3} style={{ border: "1px solid #000", padding: "5px 6px", textAlign: "right", fontWeight: 800 }}>TOTAL US:</td>
-            <td style={{ border: "1px solid #000", padding: "5px 6px", textAlign: "right", fontWeight: 800 }}>{usd(cotizacion.total)}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div style={{ fontSize: 11.5, marginTop: 12, lineHeight: 1.7 }}>
-        <div style={{ fontWeight: 700 }}>PRECIO EN DÓLAR AMERICANO (US$)</div>
-        {cotizacion.garantia && <div><b>GARANTÍA:</b> {cotizacion.garantia}</div>}
-        {notasDe(cotizacion).map((n, i) => (
-          <div key={i}>{i === 0 ? <b>NOTA: </b> : <span style={{ paddingLeft: 44 }} />}{n}</div>
-        ))}
-      </div>
-
-      <div style={{ textAlign: "center", fontSize: 10, marginTop: 26, borderTop: "1px solid #000", paddingTop: 8, lineHeight: 1.6 }}>
-        <div>{e.direccion}</div>
-        <div>{e.telefonos}{e.email ? ` · ${e.email}` : ""}</div>
-        {e.web && <div>{e.web}</div>}
-      </div>
-    </div>
-  );
-}
-
 // ── MÓDULO ────────────────────────────────────────────────────────────────────
 export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, setClientes, inventario, repuestos, empresa, onAprobar, onEditarAprobada }) {
   const [modal, setModal] = useState(false);
   const [detalle, setDetalle] = useState(null);
   const [form, setForm] = useState(null);
   const [creandoCliente, setCreandoCliente] = useState(false);
-  const [imprimiendo, setImprimiendo] = useState(null);
+  const [generando, setGenerando] = useState(false);
 
-  // Hay que esperar a que la hoja esté pintada antes de abrir el diálogo de
-  // impresión, o el navegador imprimiría una página en blanco.
-  useEffect(() => {
-    if (!imprimiendo) return;
-    const t = setTimeout(() => { window.print(); setImprimiendo(null); }, 200);
-    return () => clearTimeout(t);
-  }, [imprimiendo]);
+  // El PDF se construye aquí y se entrega como archivo. La impresión del
+  // navegador no servía: dentro de una PWA instalada en Android, Chrome no
+  // ofrece diálogo de impresión y el botón no hacía nada.
+  const generarPDF = async q => {
+    setGenerando(true);
+    try {
+      // Se carga aquí, no al arrancar: la librería de PDF pesa medio megabyte
+      // y los técnicos, que son quienes van con datos móviles, ni siquiera ven
+      // las cotizaciones. Que lo descargue solo quien lo va a usar.
+      const { construirPDF, nombreArchivo, entregarPDF } = await import("./pdfCotizacion.js");
+      const doc = construirPDF({
+        cotizacion: q,
+        cliente: cli(q.clienteId),
+        empresa,
+        inventario,
+        notas: notasDe(q),
+      });
+      await entregarPDF(doc, nombreArchivo(q));
+    } catch {
+      alert("No se pudo generar el PDF. Inténtalo de nuevo.");
+    } finally {
+      setGenerando(false);
+    }
+  };
 
   const cli = id => clientes.find(c => c.id === id);
   const nc = id => cli(id)?.nombre || "—";
@@ -473,17 +391,15 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
           <div style={{ height: 12 }} />
 
           <div style={{ display: "flex", gap: 10 }}>
-            <Btn onClick={() => setImprimiendo(detalle)} color={ac} full>🖨️ Generar PDF</Btn>
+            <Btn onClick={() => generarPDF(detalle)} color={ac} full disabled={generando}>
+              {generando ? "Generando…" : "📄 Generar PDF"}
+            </Btn>
             <Btn onClick={() => setDetalle(null)} color={TEXT_SUB} outline full>Cerrar</Btn>
           </div>
           <p style={{ margin: "10px 0 0", fontSize: 11, color: TEXT_SUB, textAlign: "center" }}>
-            En el diálogo de impresión elige “Guardar como PDF”.
+            En el móvil se abre el menú de compartir, para mandarlo por WhatsApp.
           </p>
         </Modal>
-      )}
-
-      {imprimiendo && (
-        <HojaImpresion cotizacion={imprimiendo} cliente={cli(imprimiendo.clienteId)} empresa={empresa} inventario={inventario} />
       )}
 
       {/* ── Formulario ── */}
