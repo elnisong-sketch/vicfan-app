@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { collection, doc, onSnapshot, writeBatch } from "firebase/firestore";
+import { collection, doc, onSnapshot, writeBatch, query, where } from "firebase/firestore";
 import { db } from "./firebase";
 import { cargarLS } from "./ui.jsx";
 
@@ -33,8 +33,14 @@ const limpiar = obj => JSON.parse(JSON.stringify(obj));
  * @param activa  si es false, no se conecta a la nube. Se usa para que un
  *                técnico no intente siquiera leer las cotizaciones: las reglas
  *                se lo negarían y solo conseguiría errores en pantalla.
+ * @param filtro  condición [campo, valor] para pedir solo parte de la
+ *                colección. Hace falta cuando las reglas limitan lo que se
+ *                puede leer: las reglas de Firestore NO filtran, autorizan. Si
+ *                se pide la colección entera y alguno de sus documentos no
+ *                estuviera permitido, se deniega la consulta completa aunque
+ *                el resto sí lo estuviera. Hay que pedir ya solo lo permitido.
  */
-export function useColeccion(nombre, semilla, activa = true) {
+export function useColeccion(nombre, semilla, activa = true, filtro = null) {
   const claveLS = `vf_${nombre}`;
   const ruta = `vicfan_${nombre}`;
 
@@ -52,9 +58,13 @@ export function useColeccion(nombre, semilla, activa = true) {
   useEffect(() => { guardarLocal(claveLS, items); }, [claveLS, items]);
 
   // ── Bajar: escuchar la colección ────────────────────────────────────────────
+  const claveFiltro = filtro ? `${filtro[0]}=${filtro[1]}` : "";
+
   useEffect(() => {
     if (!activa) return;
-    const unsub = onSnapshot(collection(db, ruta), snap => {
+    const col = collection(db, ruta);
+    const consulta = filtro ? query(col, where(filtro[0], "==", filtro[1])) : col;
+    const unsub = onSnapshot(consulta, snap => {
       const remotos = snap.docs.map(d => d.data());
 
       // Primera conexión con la nube vacía: este equipo la siembra con lo que
@@ -70,7 +80,8 @@ export function useColeccion(nombre, semilla, activa = true) {
       setItems(actual => igual(actual, remotos) ? actual : remotos);
     }, () => {});
     return () => unsub();
-  }, [ruta, activa]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ruta, activa, claveFiltro]);
 
   // ── Subir: mandar solo lo que cambió ────────────────────────────────────────
   useEffect(() => {

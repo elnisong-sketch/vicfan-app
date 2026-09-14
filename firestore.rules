@@ -18,8 +18,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Nada de exigir correo verificado: los correos de los tecnicos son
+    // identificadores internos inventados (tecnico1@vicfan.app) que nunca van
+    // a poder recibir un mensaje de confirmacion. Pedirlo dejaba a todo el
+    // mundo fuera. Lo que protege de verdad es estar en `vicfan_acceso`.
     function autenticado() {
-      return request.auth != null && request.auth.token.email_verified != false;
+      return request.auth != null;
     }
 
     function correo() {

@@ -463,7 +463,11 @@ export default function App() {
   const [clientes, setClientes]         = useColeccion("clientes", CLIENTES_DEMO, conectado);
   const [cotizaciones, setCotizaciones] = useColeccion("cotizaciones", COTIZACIONES_DEMO, esOficina);
   const [ventas, setVentas]             = useColeccion("ventas", VENTAS_DEMO, esOficina);
-  const [tareas, setTareas]             = useColeccion("tareas", cargarTareas, conectado);
+  // El técnico pide solo las publicadas. No es cosmético: las reglas le niegan
+  // el resto, y pedir la colección entera haría que se denegara toda la
+  // consulta, dejándole sin ninguna tarea.
+  const [tareas, setTareas]             = useColeccion("tareas", cargarTareas, conectado,
+                                            esOficina ? null : ["publicada", true]);
   const [inventario, setInventario]     = useColeccion("inventario", MODELOS_DEMO, conectado);
   const [repuestos, setRepuestos]       = useColeccion("repuestos", REPUESTOS_DEMO, conectado);
   const [garantias, setGarantias]       = useColeccion("garantias", GARANTIAS_DEMO, conectado);
