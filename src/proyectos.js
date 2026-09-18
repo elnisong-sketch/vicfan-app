@@ -19,6 +19,30 @@ export const MESES_MANTENIMIENTO = [
   { value: 0,  label: "Sin mantenimiento" },
 ];
 
+// Garantía de fábrica de la planta: corre desde el día en que se pone en
+// funcionamiento, no desde que se vende ni desde que se cierra el proyecto.
+export const MESES_GARANTIA = 24;
+
+/** Días que faltan hasta una fecha (negativo si ya pasó). */
+export const diasHasta = iso => Math.round((new Date(iso + "T12:00:00") - new Date(hoy() + "T12:00:00")) / 86400000);
+
+/**
+ * Garantía de un proyecto. Su id se deriva del proyecto para que no pueda
+ * haber dos garantías del mismo trabajo aunque se pulse el botón dos veces.
+ */
+export const garantiaDeProyecto = (proyecto, { fecha, serial = "", meses = MESES_GARANTIA }) => ({
+  id: `gar-${proyecto.id}`,
+  proyectoId: proyecto.id,
+  proyectoNombre: proyecto.nombre,
+  clienteId: proyecto.clienteId,
+  modelo: proyecto.equipo || "",
+  serial: serial.trim(),
+  fechaInstalacion: fecha,
+  mesesGarantia: meses,
+  vence: sumarMeses(fecha, meses),
+  activadaEn: new Date().toISOString(),
+});
+
 export const proyectoVacio = (datos = {}) => ({
   id: uid(),
   nombre: "",

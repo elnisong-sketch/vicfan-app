@@ -2,13 +2,13 @@ import { useState, useEffect } from "react";
 import { useColeccion } from "./datos.js";
 import {
   NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB,
-  ACENTOS, ESTADO_COLOR, hoy, usd, uid,
+  ACENTOS, ESTADO_COLOR, hoy, usd, uid, sumarMeses, fechaCorta,
   Badge, Btn, Card, Inp, Sel, Modal, CampoImagen,
 } from "./ui.jsx";
 import { prepararImagen, prepararLogo } from "./imagenes.js";
 import ModuloTareas, { registrar } from "./modules/Tareas.jsx";
 import ModuloOperaciones from "./modules/Operaciones.jsx";
-import { proyectoVacio, tareaDeProyecto, planAutomatico } from "./proyectos.js";
+import { proyectoVacio, tareaDeProyecto, planAutomatico, diasHasta } from "./proyectos.js";
 import ModuloCotizaciones, { EMPRESA_POR_DEFECTO } from "./modules/Cotizaciones.jsx";
 import PantallaLogin from "./sesion.jsx";
 import { useSesion, salir as cerrarSesion } from "./auth.js";
@@ -171,24 +171,23 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }
 function ModuloGarantias({ garantias, clientes }) {
   const ac = ACENTOS.garantias;
   const nc = id => clientes.find(c => c.id === id)?.nombre || "—";
-  const diasRestantes = (fechaInst, meses) => {
-    const v = new Date(fechaInst); v.setMonth(v.getMonth() + meses);
-    return Math.ceil((v - new Date()) / 86400000);
-  };
+  const venceDe = g => g.vence || sumarMeses(g.fechaInstalacion, g.mesesGarantia);
+  const diasRestantes = g => diasHasta(venceDe(g));
   return (
     <div>
       <h2 style={{ color: ac, margin: "0 0 16px", fontSize: 18, fontWeight: 900 }}>🛡️ Garantías</h2>
-      {garantias.length === 0 && <p style={{ color: TEXT_SUB, textAlign: "center", marginTop: 40 }}>Sin garantías registradas</p>}
-      {garantias.map(g => {
-        const dias = diasRestantes(g.fechaInstalacion, g.mesesGarantia);
+      {garantias.length === 0 && <p style={{ color: TEXT_SUB, textAlign: "center", marginTop: 40 }}>Sin garantías todavía. Se activan desde cada proyecto, el día de la puesta en marcha.</p>}
+      {[...garantias].sort((a, b) => venceDe(a).localeCompare(venceDe(b))).map(g => {
+        const dias = diasRestantes(g);
         const col = dias > 30 ? GREEN : dias > 0 ? ORANGE : RED;
         return (
           <Card key={g.id}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15 }}>{nc(g.clienteId)}</p>
-                <p style={{ margin: "0 0 2px", fontSize: 13, color: TEXT_SUB }}>⚡ {g.modelo} · 🔢 {g.serial}</p>
-                <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB }}>📅 Instalado: {g.fechaInstalacion} · {g.mesesGarantia} meses</p>
+                {g.proyectoNombre && <p style={{ margin: "0 0 2px", fontSize: 13, color: TEXT_SUB }}>🏗️ {g.proyectoNombre}</p>}
+                <p style={{ margin: "0 0 2px", fontSize: 13, color: TEXT_SUB }}>⚡ {g.modelo || "—"}{g.serial ? ` · 🔢 ${g.serial}` : ""}</p>
+                <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB }}>▶️ Puesta en marcha: {fechaCorta(g.fechaInstalacion)} · vence el {fechaCorta(venceDe(g))}</p>
               </div>
               <Badge text={dias > 0 ? `${dias} días` : "Vencida"} color={col} />
             </div>
@@ -627,6 +626,7 @@ export default function App() {
         {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} onResolverInspeccion={resolverInspeccion} />}
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario}
+                                     garantias={garantias} setGarantias={setGarantias}
                                      crearProyecto={crearProyecto} onResolverInspeccion={resolverInspeccion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}

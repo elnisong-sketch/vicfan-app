@@ -6,7 +6,7 @@ import {
 } from "../ui.jsx";
 import { registrar, estaAbierta, esIncidencia, claseInspeccion, ETIQUETA_ORIGEN, RESULTADO_COLOR } from "./Tareas.jsx";
 import { SelectorCliente, ModalInspeccion } from "./Inspeccion.jsx";
-import { proyectoVacio, tareaDeProyecto, MESES_MANTENIMIENTO } from "../proyectos.js";
+import { proyectoVacio, tareaDeProyecto, MESES_MANTENIMIENTO, MESES_GARANTIA, diasHasta, garantiaDeProyecto } from "../proyectos.js";
 
 // Proyectos, inspecciones y mantenimientos, en un solo sitio para la oficina.
 //
@@ -63,7 +63,52 @@ function ModalProyecto({ clientes, onCrearCliente, inventario, onGuardar, onCerr
 }
 
 // ── Detalle del proyecto ───────────────────────────────────────────────────────
-function DetalleProyecto({ proyecto, tareas, nombreCliente, onVisita, onCerrarProyecto, onReabrir, onMeses, onCerrar }) {
+// ── Garantía: empieza a correr el día de la puesta en marcha ──────────────────
+function BloqueGarantia({ garantia, onActivar, onAnular }) {
+  const [fecha, setFecha] = useState(hoy());
+  const [serial, setSerial] = useState("");
+  const verde = ACENTOS.garantias;
+
+  if (garantia) {
+    const dias = diasHasta(garantia.vence);
+    const color = dias > 30 ? GREEN : dias > 0 ? ORANGE : RED;
+    return (
+      <div style={{ border: `1.5px solid ${color}55`, background: color + "11", borderRadius: 12, padding: 14, marginBottom: 14, fontSize: 13, lineHeight: 1.7 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <b style={{ color, fontSize: 14 }}>🛡️ Garantía activa</b>
+          <Badge text={dias > 0 ? `${dias} días` : "Vencida"} color={color} small />
+        </div>
+        <div>▶️ <b>Puesta en marcha:</b> {fechaLarga(garantia.fechaInstalacion)}</div>
+        <div>⏳ <b>Vence:</b> {fechaLarga(garantia.vence)} ({garantia.mesesGarantia} meses)</div>
+        {garantia.serial && <div>🔢 <b>Serial:</b> {garantia.serial}</div>}
+        <button onClick={onAnular} style={{ background: "none", border: "none", color: TEXT_SUB, fontSize: 12, textDecoration: "underline", cursor: "pointer", padding: 0, marginTop: 4 }}>
+          Anular (si se activó por error)
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ border: `1.5px dashed ${verde}88`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+      <p style={{ margin: "0 0 4px", fontWeight: 800, fontSize: 14, color: verde }}>🛡️ Garantía sin activar</p>
+      <p style={{ margin: "0 0 12px", fontSize: 12, color: TEXT_SUB, lineHeight: 1.5 }}>
+        Actívala el día que la planta se pone en funcionamiento: desde ese día corren sus {MESES_GARANTIA} meses.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+        <div>
+          <Etiqueta>Puesta en marcha</Etiqueta>
+          <input type="date" value={fecha} max={hoy()} onChange={e => setFecha(e.target.value)} style={estiloInput} />
+        </div>
+        <div>
+          <Etiqueta>Serial (opcional)</Etiqueta>
+          <input value={serial} onChange={e => setSerial(e.target.value)} placeholder="Nº de serie" style={estiloInput} />
+        </div>
+      </div>
+      <Btn onClick={() => onActivar({ fecha, serial })} color={verde} full disabled={!fecha}>🛡️ Activar garantía</Btn>
+    </div>
+  );
+}
+
+function DetalleProyecto({ proyecto, tareas, garantia, nombreCliente, onVisita, onCerrarProyecto, onReabrir, onMeses, onActivarGarantia, onAnularGarantia, onCerrar }) {
   const [tipoVisita, setTipoVisita] = useState("Reparación");
   const [fechaVisita, setFechaVisita] = useState(hoy());
   const suyas = tareas.filter(t => t.proyectoId === proyecto.id).sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -86,6 +131,8 @@ function DetalleProyecto({ proyecto, tareas, nombreCliente, onVisita, onCerrarPr
         {proyecto.descripcion && <div style={{ whiteSpace: "pre-line" }}>📝 {proyecto.descripcion}</div>}
         <div>🔩 <b>Próximo mantenimiento:</b> {proximo ? fechaLarga(proximo.fecha) : cerrado ? "—" : "se programa al cerrar el proyecto"}</div>
       </div>
+
+      <BloqueGarantia garantia={garantia} onActivar={onActivarGarantia} onAnular={onAnularGarantia} />
 
       <Sel label="Mantenimiento" value={String(proyecto.mantenimientoMeses ?? 6)} onChange={v => onMeses(Number(v))}
         options={MESES_MANTENIMIENTO.map(o => ({ value: String(o.value), label: o.label }))} />
@@ -131,7 +178,8 @@ function DetalleProyecto({ proyecto, tareas, nombreCliente, onVisita, onCerrarPr
 }
 
 // ── Módulo ─────────────────────────────────────────────────────────────────────
-export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, crearProyecto, onResolverInspeccion }) {
+export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, garantias, setGarantias, crearProyecto, onResolverInspeccion }) {
+  const garantiaDe = id => garantias.find(g => g.proyectoId === id);
   const [vista, setVista] = useState("proyectos");
   const [modal, setModal] = useState(null);          // "proyecto" | "Visita comercial" | "Incidencia del cliente"
   const [detalle, setDetalle] = useState(null);
@@ -213,6 +261,9 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
               {pendientes ? `${pendientes} visita${pendientes === 1 ? "" : "s"} pendiente${pendientes === 1 ? "" : "s"}` : "Sin visitas pendientes"}
               {proximo ? ` · 🔩 ${fechaCorta(proximo.fecha)}` : ""}
             </p>
+            <p style={{ margin: "3px 0 0", fontSize: 12, fontWeight: 700, color: garantiaDe(p.id) ? ACENTOS.garantias : TEXT_SUB }}>
+              {garantiaDe(p.id) ? `🛡️ Garantía hasta el ${fechaCorta(garantiaDe(p.id).vence)}` : "🛡️ Garantía sin activar"}
+            </p>
           </div>
           <Badge text={p.estado} color={p.estado === "Cerrado" ? GREEN : ac} small />
         </div>
@@ -290,6 +341,17 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
           onVisita={(tipo, fecha) => setTareas(p => [...p, registrar(tareaDeProyecto(proyectoAbierto, { tipo, fecha }), `${tipo} añadida al proyecto`, "Oficina")])}
           onCerrarProyecto={() => actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, estado: "Cerrado", fechaCierre: hoy() }, "Cerrado a mano", "Oficina"))}
           onReabrir={() => actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, estado: "Abierto", fechaCierre: null, autoCierre: false }, "Reabierto", "Oficina"))}
+          garantia={garantiaDe(proyectoAbierto.id)}
+          onActivarGarantia={({ fecha, serial }) => {
+            const g = garantiaDeProyecto(proyectoAbierto, { fecha, serial });
+            setGarantias(p => [...p.filter(x => x.id !== g.id), g]);
+            actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, fechaPuestaEnMarcha: fecha }, `Garantía activada: puesta en marcha el ${fechaCorta(fecha)}, vence el ${fechaCorta(g.vence)}`, "Oficina"));
+          }}
+          onAnularGarantia={() => {
+            if (!confirm("¿Anular la garantía de este proyecto?")) return;
+            setGarantias(p => p.filter(x => x.proyectoId !== proyectoAbierto.id));
+            actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, fechaPuestaEnMarcha: null }, "Garantía anulada", "Oficina"));
+          }}
           onMeses={m => actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, mantenimientoMeses: m }, m ? `Mantenimiento cada ${m} meses` : "Sin mantenimiento", "Oficina"))}
           onCerrar={() => setDetalle(null)} />
       )}
