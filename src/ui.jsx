@@ -18,6 +18,7 @@ export const ACENTOS = {
   cotizaciones: "#f26522",
   ventas:       "#10b981",
   tareas:       "#0ea5e9",
+  operaciones:  "#14b8a6",
   inventario:   "#8b5cf6",
   garantias:    "#ec4899",
   admin:        "#64748b",
@@ -55,6 +56,17 @@ export const diaDelMes = iso => aFecha(iso).getDate();
 export const fechaLarga = iso => aFecha(iso).toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
 export const fechaCorta = iso => aFecha(iso).toLocaleDateString("es-VE", { day: "2-digit", month: "short" });
 export const esHoy = iso => iso === hoy();
+/** Suma meses a una fecha AAAA-MM-DD. El 31 de agosto + 6 meses es el 28 de
+ *  febrero, no el 3 de marzo: si el día no existe, se queda en el último. */
+export const sumarMeses = (iso, n) => {
+  const d = aFecha(iso);
+  const dia = d.getDate();
+  d.setMonth(d.getMonth() + n);
+  if (d.getDate() !== dia) d.setDate(0);
+  return aISO(d);
+};
+/** Día (hora de Venezuela) en que ocurrió un instante guardado como ISO. */
+export const fechaDeInstante = ts => new Intl.DateTimeFormat("en-CA", { timeZone: ZONA, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ts));
 export const esPasado = iso => iso < hoy();
 // Los sellos de hora se muestran en hora de Venezuela: si un técnico cerró una
 // tarea a las 3 de la tarde, la oficina en España tiene que leer "3 de la

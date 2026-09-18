@@ -51,6 +51,10 @@ export function useColeccion(nombre, semilla, activa = true, filtro = null) {
   // cambió de verdad y mandar solo eso. `null` = todavía no hemos hablado con
   // la nube, así que no se sube nada (no vaya a pisar algo más nuevo).
   const enNube = useRef(null);
+  // true en cuanto llega la primera respuesta de la nube. Lo que se calcula
+  // sobre los datos y ESCRIBE (p. ej. programar mantenimientos) debe esperar a
+  // esto: con la copia local, que puede estar anticuada, se decidiría mal.
+  const [listo, setListo] = useState(false);
 
   useEffect(() => { guardarLocal(claveLS, items); }, [claveLS, items]);
 
@@ -70,6 +74,7 @@ export function useColeccion(nombre, semilla, activa = true, filtro = null) {
       // app volvía a subir los datos viejos.
       enNube.current = remotos;
       setItems(actual => igual(actual, remotos) ? actual : remotos);
+      setListo(true);
     }, () => {});
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,5 +110,5 @@ export function useColeccion(nombre, semilla, activa = true, filtro = null) {
     }
   }, [ruta, items, activa]);
 
-  return [items, setItems];
+  return [items, setItems, listo];
 }

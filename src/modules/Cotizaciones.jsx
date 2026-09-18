@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ACENTOS, ESTADO_COLOR, BORDER, BG_INPUT, TEXT_SUB, GREEN, RED,
   hoy, usd, uid,
@@ -148,7 +148,7 @@ function SelLibre({ label, value, onChange, opciones, placeholder }) {
 }
 
 // ── ALTA DE CLIENTE SIN SALIR DE LA COTIZACIÓN ────────────────────────────────
-function NuevoCliente({ onCrear, onCancelar }) {
+export function NuevoCliente({ onCrear, onCancelar }) {
   const [f, setF] = useState({ nombre: "", documento: "", telefono: "", direccion: "", tipo: "Residencial" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
 
@@ -252,7 +252,7 @@ function LineasItems({ items, onCambio, inventario, repuestos }) {
 }
 
 // ── MÓDULO ────────────────────────────────────────────────────────────────────
-export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, setClientes, inventario, repuestos, empresa, onAprobar, onEditarAprobada }) {
+export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, setClientes, inventario, repuestos, empresa, onAprobar, onEditarAprobada, inicial, onInicialUsado }) {
   const [modal, setModal] = useState(false);
   const [detalle, setDetalle] = useState(null);
   const [form, setForm] = useState(null);
@@ -291,6 +291,17 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
   const setItems = items => setForm(f => ({ ...f, items, total: items.reduce((s, i) => s + (i.subtotal || 0), 0) }));
 
   const abrirNueva = () => { setForm(cotizacionVacia(cotizaciones)); setCreandoCliente(false); setModal(true); };
+
+  // Llegada desde una inspección que se concretó: se abre una cotización nueva
+  // con el cliente ya puesto, y queda enlazada a esa inspección.
+  useEffect(() => {
+    if (!inicial) return;
+    setForm({ ...cotizacionVacia(cotizaciones), clienteId: inicial.clienteId, inspeccionId: inicial.inspeccionId });
+    setCreandoCliente(false);
+    setModal(true);
+    onInicialUsado?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inicial]);
   const abrirEdicion = q => { setForm({ ...q }); setCreandoCliente(false); setModal(true); };
 
   const crearCliente = nuevo => {

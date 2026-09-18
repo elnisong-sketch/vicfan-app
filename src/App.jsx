@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useColeccion } from "./datos.js";
 import {
   NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB,
@@ -6,7 +6,9 @@ import {
   Badge, Btn, Card, Inp, Sel, Modal, CampoImagen,
 } from "./ui.jsx";
 import { prepararImagen, prepararLogo } from "./imagenes.js";
-import ModuloTareas, { tareaVacia } from "./modules/Tareas.jsx";
+import ModuloTareas, { registrar } from "./modules/Tareas.jsx";
+import ModuloOperaciones from "./modules/Operaciones.jsx";
+import { proyectoVacio, tareaDeProyecto, planAutomatico } from "./proyectos.js";
 import ModuloCotizaciones, { EMPRESA_POR_DEFECTO } from "./modules/Cotizaciones.jsx";
 import PantallaLogin from "./sesion.jsx";
 import { useSesion, salir as cerrarSesion } from "./auth.js";
@@ -16,6 +18,7 @@ import AvisoInstalar from "./instalar.jsx";
 
 const TABS = [
   { id: "tareas",       icon: "📅", label: "Tareas" },
+  { id: "operaciones",  icon: "🏗️", label: "Proyectos" },
   { id: "clientes",     icon: "👥", label: "Clientes" },
   { id: "cotizaciones", icon: "📋", label: "Cotizac." },
   { id: "ventas",       icon: "💰", label: "Ventas" },
@@ -344,6 +347,15 @@ function ModuloBienvenida({ setTab, stats }) {
         </Card>
       )}
 
+      {[[stats.inspeccionesPorResolver, "inspección por resolver", "inspecciones por resolver", ORANGE],
+        [stats.mantenimientosVencidos, "mantenimiento vencido", "mantenimientos vencidos", RED]]
+        .filter(([n]) => n > 0).map(([n, uno, varios, color]) => (
+          <Card key={uno} onClick={() => setTab("operaciones")} style={{ background: color + "11", border: `1px solid ${color}44`, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color }}>🏗️ {n} {n > 1 ? varios : uno}</span>
+            <span style={{ color, fontWeight: 900 }}>›</span>
+          </Card>
+        ))}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 6 }}>
         {secciones.map(s => (
           <button key={s.id} onClick={() => setTab(s.id)} style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderTop: `3px solid ${s.color}`, borderRadius: 14, padding: "16px 8px", cursor: "pointer", textAlign: "center", boxShadow: "0 2px 8px #0001" }}>
@@ -373,7 +385,7 @@ export default function App() {
   // El técnico pide solo las publicadas. No es cosmético: las reglas le niegan
   // el resto, y pedir la colección entera haría que se denegara toda la
   // consulta, dejándole sin ninguna tarea.
-  const [tareas, setTareas]             = useColeccion("tareas", [], conectado,
+  const [tareas, setTareas, tareasListas] = useColeccion("tareas", [], conectado,
                                             esOficina ? null : ["publicada", true]);
   const [inventario, setInventario]     = useColeccion("inventario", [], conectado);
   const [repuestos, setRepuestos]       = useColeccion("repuestos", [], conectado);
@@ -382,6 +394,9 @@ export default function App() {
   // Membrete del presupuesto: una sola ficha, pero se sincroniza igual que el
   // resto para que ambos dispositivos emitan con los mismos datos.
   const [empresaLista, setEmpresaLista] = useColeccion("empresa", [EMPRESA_POR_DEFECTO], esOficina);
+  const [proyectos, setProyectos, proyectosListos] = useColeccion("proyectos", [], esOficina);
+  // Cotización que hay que abrir ya rellenada al llegar desde una inspección.
+  const [cotizacionInicial, setCotizacionInicial] = useState(null);
   const empresa = empresaLista[0] || EMPRESA_POR_DEFECTO;
 
 
@@ -399,21 +414,86 @@ export default function App() {
     costo: q.total,
   });
 
-  // Aprobar una cotización crea la tarea de instalación correspondiente. Nace
-  // sin publicar: la oficina la agenda y decide cuándo se la enseña al técnico.
+  // Crea un proyecto y su tarea de instalación, sin publicar. Es la puerta
+  // común de las tres formas de empezar un trabajo: una cotización aprobada,
+  // una inspección que se concretó o un proyecto creado directamente.
+  const crearProyecto = (datos, tarea = {}) => {
+    const proyecto = registrar(proyectoVacio(datos), `Creado (${datos.origen || "Directo"})`, "Oficina");
+    setProyectos(p => [...p, proyecto]);
+    setTareas(p => [...p, registrar(tareaDeProyecto(proyecto, {
+      tipo: "Instalación",
+      fecha: proyecto.fechaInicio,
+      descripcion: proyecto.descripcion,
+      ...tarea,
+    }), `Creada con el proyecto «${proyecto.nombre}»`, "Oficina")]);
+    return proyecto;
+  };
+
+  // Aprobar una cotización abre su proyecto con la tarea de instalación, que
+  // nace sin publicar: la oficina la agenda y decide cuándo la ve el técnico.
   const aprobarCotizacion = q => {
     setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Aprobada" } : x));
-    setTareas(p => [...p, {
-      ...tareaVacia(q.clienteId),
-      tipo: "Instalación",
+    const alcance = alcanceDeCotizacion(q);
+    crearProyecto({
+      nombre: `Instalación ${alcance.modelo || "cotización " + q.numero}`,
+      clienteId: q.clienteId,
       direccion: clientes.find(c => c.id === q.clienteId)?.direccion || "",
-      duracionDias: 2,
+      equipo: alcance.modelo,
+      descripcion: alcance.descripcion,
+      origen: `Cotización Nº ${q.numero}`,
       cotizacionId: q.id,
-      ...alcanceDeCotizacion(q),
-      historial: [{ accion: `Creada desde la cotización Nº ${q.numero}`, quien: "Oficina", cuando: new Date().toISOString() }],
-    }]);
+      inspeccionId: q.inspeccionId || null,
+    }, { duracionDias: 2, cotizacionId: q.id, costo: alcance.costo });
     setTab("tareas");
   };
+
+  // Cerrar el círculo de una inspección ya realizada: o se convierte en
+  // trabajo, o queda escrito que no se concretó y por qué.
+  const resolverInspeccion = (insp, resultado) => {
+    const marcar = (campos, accion) => setTareas(p => p.map(t => t.id === insp.id ? registrar({ ...t, ...campos }, accion, "Oficina") : t));
+    const cliente = clientes.find(c => c.id === insp.clienteId);
+
+    if (resultado === "no") {
+      const motivo = window.prompt("¿Por qué no se concretó? (opcional)");
+      if (motivo === null) return;
+      marcar({ resultado: "No concretada", motivoNoConcretada: motivo.trim() }, "Resultado: no se concretó");
+      return;
+    }
+    if (resultado === "cotizacion") {
+      marcar({ resultado: "Cotización" }, "Resultado: se hace cotización");
+      setCotizacionInicial({ clienteId: insp.clienteId, inspeccionId: insp.id });
+      setTab("cotizaciones");
+      return;
+    }
+    const proyecto = crearProyecto({
+      nombre: insp.modelo ? `Instalación ${insp.modelo}` : `Proyecto ${cliente?.nombre || ""}`.trim(),
+      clienteId: insp.clienteId,
+      direccion: insp.direccion || cliente?.direccion || "",
+      equipo: insp.modelo || "",
+      descripcion: insp.descripcion || "",
+      origen: "Inspección",
+      inspeccionId: insp.id,
+    });
+    marcar({ resultado: "Proyecto", proyectoIdGenerado: proyecto.id }, `Resultado: proyecto «${proyecto.nombre}»`);
+    setTab("operaciones");
+  };
+
+  // Automatismos: cerrar los proyectos cuyo trabajo ha terminado y programar
+  // su siguiente mantenimiento. Solo en la oficina —las reglas no dejan a un
+  // técnico crear tareas ni tocar proyectos— y solo cuando las dos listas ya
+  // han llegado de la nube: decidir con la copia local, que puede estar
+  // anticuada, podría pisar un mantenimiento que ya existe.
+  useEffect(() => {
+    if (!esOficina || !tareasListas || !proyectosListos) return;
+    const plan = planAutomatico(proyectos, tareas);
+    if (plan.proyectos.length) {
+      const porId = new Map(plan.proyectos.map(p => [p.id, p]));
+      setProyectos(prev => prev.map(p => porId.get(p.id) || p));
+    }
+    if (plan.tareasNuevas.length) {
+      setTareas(prev => [...prev, ...plan.tareasNuevas.filter(n => !prev.some(t => t.id === n.id))]);
+    }
+  }, [esOficina, tareasListas, proyectosListos, proyectos, tareas]);
 
   // Si el cliente cambia de idea y se modifica un presupuesto ya aprobado, la
   // tarea tiene que reflejarlo: el técnico va a la calle con ese alcance. El
@@ -439,11 +519,12 @@ export default function App() {
     if (Array.isArray(d.repuestos))    setRepuestos(d.repuestos);
     if (Array.isArray(d.garantias))    setGarantias(d.garantias);
     if (Array.isArray(d.tecnicos))     setTecnicos(d.tecnicos);
+    if (Array.isArray(d.proyectos))    setProyectos(d.proyectos);
     setTab("inicio");
   };
 
   const exportarDatos = () => {
-    const datos = { clientes, cotizaciones, ventas, tareas, inventario, repuestos, garantias, tecnicos, exportado: new Date().toISOString() };
+    const datos = { clientes, cotizaciones, ventas, tareas, proyectos, inventario, repuestos, garantias, tecnicos, exportado: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -487,6 +568,8 @@ export default function App() {
     cotizacionesPendientes: cotizaciones.filter(q => q.estado === "Pendiente").length,
     tareasHoy: mias.filter(t => t.fecha === hoy()).length,
     tareasAtrasadas: mias.filter(t => abierta(t) && t.fecha < hoy()).length,
+    inspeccionesPorResolver: tareas.filter(t => t.tipo === "Inspección" && t.estado === "Completada" && !t.resultado).length,
+    mantenimientosVencidos: tareas.filter(t => t.tipo === "Mantenimiento" && abierta(t) && t.fecha < hoy()).length,
   };
 
   const Cabecera = () => (
@@ -538,9 +621,13 @@ export default function App() {
 
       <div className="main-content" style={{ maxWidth: 760, margin: "0 auto" }}>
         {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} /></>}
-        {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} tecnicos={tecnicos} sesion={sesion} />}
+        {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} tecnicos={tecnicos} sesion={sesion} onResolverInspeccion={resolverInspeccion} />}
+        {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
+                                     clientes={clientes} setClientes={setClientes} inventario={inventario}
+                                     crearProyecto={crearProyecto} onResolverInspeccion={resolverInspeccion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
-        {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion} />}
+        {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
+                                     inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}

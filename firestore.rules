@@ -76,6 +76,9 @@ service cloud.firestore {
     match /vicfan_cotizaciones/{id} { allow read, write: if esOficina(); }
     match /vicfan_ventas/{id}       { allow read, write: if esOficina(); }
     match /vicfan_empresa/{id}      { allow read, write: if esOficina(); }
+    // Proyectos: solo oficina. El tecnico ve el nombre del proyecto porque va
+    // copiado en cada tarea, sin necesitar leer esta coleccion.
+    match /vicfan_proyectos/{id}    { allow read, write: if esOficina(); }
 
     // ── Datos de apoyo ────────────────────────────────────────────────────────
     // El técnico necesita leer a qué cliente va y qué equipo lleva, pero no

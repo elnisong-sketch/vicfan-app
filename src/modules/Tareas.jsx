@@ -45,13 +45,29 @@ export const tareaVacia = (clienteId, tecnicoId) => ({
 });
 
 /** Añade una línea al historial inmutable de la tarea. */
-const registrar = (tarea, accion, quien) => ({
+export const registrar = (tarea, accion, quien) => ({
   ...tarea,
   historial: [...(tarea.historial || []), { accion, quien, cuando: new Date().toISOString() }],
 });
 
 const ordenarPorHora = (a, b) => (a.hora || "").localeCompare(b.hora || "");
-const estaAbierta = t => t.estado === "Programada" || t.estado === "En proceso";
+export const estaAbierta = t => t.estado === "Programada" || t.estado === "En proceso";
+
+// Categorías para no mezclar en una misma lista una incidencia urgente con un
+// mantenimiento que toca dentro de seis meses. Las ven también los técnicos.
+const CATEGORIAS = [
+  { value: "todas",         label: "Todas" },
+  { value: "Inspección",    label: "🔍 Inspecciones" },
+  { value: "Instalación",   label: "🔧 Proyectos" },
+  { value: "Mantenimiento", label: "🔩 Mantenimientos" },
+  { value: "otras",         label: "🛠️ Otras" },
+];
+const PRINCIPALES = ["Inspección", "Instalación", "Mantenimiento"];
+const enCategoria = (t, c) => c === "todas" || (c === "otras" ? !PRINCIPALES.includes(t.tipo) : t.tipo === c);
+
+export const ORIGENES_INSPECCION = ["Visita comercial", "Incidencia del cliente"];
+export const esIncidencia = t => t.tipo === "Inspección" && t.origen === "Incidencia del cliente";
+export const RESULTADO_COLOR = { "Proyecto": GREEN, "Cotización": ORANGE, "No concretada": TEXT_SUB };
 const estaAtrasada = t => estaAbierta(t) && esPasado(t.fecha);
 // Las tareas anteriores a esta función no tienen el campo, y deben seguir
 // viéndose: solo se oculta lo que se marcó explícitamente como no publicado.
@@ -179,6 +195,7 @@ function TarjetaTarea({ tarea, nombreCliente, esTecnico, onAbrir, onIniciar, onC
             <span style={{ fontSize: compacta ? 13 : 15, fontWeight: 700 }}>{TIPO_ICONO[tarea.tipo]} {nombreCliente}</span>
           </div>
           <p style={{ margin: "0 0 3px", fontSize: 13, color: TEXT_SUB }}>{tarea.tipo}{tarea.modelo ? ` · ${tarea.modelo}` : ""}</p>
+          {tarea.proyectoNombre && <p style={{ margin: "0 0 3px", fontSize: 12, color: ACENTOS.operaciones, fontWeight: 700 }}>🏗️ {tarea.proyectoNombre}</p>}
           {tarea.direccion && <p style={{ margin: "0 0 3px", fontSize: 12, color: TEXT_SUB }}>📍 {tarea.direccion}</p>}
           {/* Las tareas son del equipo, no de una persona. Los nombres de los
               técnicos solo aparecen en el registro de quién cerró o subió qué. */}
@@ -189,6 +206,8 @@ function TarjetaTarea({ tarea, nombreCliente, esTecnico, onAbrir, onIniciar, onC
           {!esTecnico && !publicada && <Badge text="Sin publicar" color={TEXT_SUB} small />}
           {atrasada && <Badge text="Atrasada" color={RED} small />}
           {tarea.prioridad !== "Normal" && <Badge text={tarea.prioridad} color={PRIORIDAD_COLOR[tarea.prioridad]} small />}
+          {esIncidencia(tarea) && <Badge text="🚨 Incidencia" color={RED} small />}
+          {tarea.resultado && <Badge text={tarea.resultado} color={RESULTADO_COLOR[tarea.resultado] || TEXT_SUB} small />}
           {tarea.fotos?.length > 0 && <span style={{ fontSize: 11, color: TEXT_SUB, fontWeight: 700 }}>📷 {tarea.fotos.length}</span>}
         </div>
       </div>
@@ -228,6 +247,10 @@ function ModalTarea({ form, setForm, clientes, onGuardar, onCerrar }) {
       <h3 style={{ margin: "0 0 16px", color: ac }}>{form.creadaEn && form.historial?.length ? "Editar tarea" : "Nueva tarea"}</h3>
 
       <Sel label="Tipo de tarea" value={form.tipo} onChange={v => set("tipo", v)} options={TIPOS_TAREA.map(t => ({ value: t, label: `${TIPO_ICONO[t]} ${t}` }))} />
+      {form.tipo === "Inspección" && (
+        <Sel label="Origen" value={form.origen || ORIGENES_INSPECCION[0]} onChange={v => set("origen", v)}
+          options={ORIGENES_INSPECCION.map(o => ({ value: o, label: o === "Incidencia del cliente" ? "🚨 Incidencia del cliente" : "🤝 Visita comercial" }))} />
+      )}
       <Sel label="Cliente" value={form.clienteId} onChange={elegirCliente} options={[{ value: "", label: "— Selecciona —" }, ...clientes.map(c => ({ value: c.id, label: c.nombre }))]} />
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
@@ -421,7 +444,7 @@ function Observaciones({ notas, onAgregar, onBorrador, quien }) {
 }
 
 // ── MODAL: DETALLE / HISTORIAL ────────────────────────────────────────────────
-function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, onCancelarTarea, onFotos, onObservacion, onReabrir, onPublicar, onCerrar }) {
+function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, onCancelarTarea, onFotos, onObservacion, onReabrir, onPublicar, onResolver, onCerrar }) {
   const [nuevaFecha, setNuevaFecha] = useState(tarea.fecha);
   const [reprogramando, setReprogramando] = useState(false);
   const [confirmarReapertura, setConfirmarReapertura] = useState(false);
@@ -444,7 +467,29 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
         <h3 style={{ margin: 0, color: ac }}>{TIPO_ICONO[tarea.tipo]} {nombreCliente}</h3>
         <Badge text={tarea.estado} color={ESTADO_COLOR[tarea.estado] || TEXT_SUB} />
       </div>
-      <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}>{tarea.tipo} · {fechaLarga(tarea.fecha)} · {tarea.hora}</p>
+      <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}>
+        {esIncidencia(tarea) ? "🚨 Incidencia" : tarea.tipo} · {fechaLarga(tarea.fecha)} · {tarea.hora}
+        {tarea.proyectoNombre && <><br /><span style={{ color: ACENTOS.operaciones, fontWeight: 700 }}>🏗️ {tarea.proyectoNombre}</span></>}
+      </p>
+
+      {/* Una inspección terminada hay que resolverla: o se convierte en
+          trabajo, o queda registrado que no se concretó. Solo la oficina. */}
+      {!esTecnico && tarea.tipo === "Inspección" && tarea.estado === "Completada" && onResolver && (
+        tarea.resultado ? (
+          <div style={{ background: BG_INPUT, borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 13 }}>
+            <b>Resultado:</b> {tarea.resultado}{tarea.motivoNoConcretada ? ` — ${tarea.motivoNoConcretada}` : ""}
+          </div>
+        ) : (
+          <div style={{ background: ORANGE + "11", border: `1px solid ${ORANGE}44`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+            <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, color: ORANGE }}>¿En qué quedó esta inspección?</p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Btn onClick={() => onResolver("proyecto")} color={GREEN} small>🏗️ Crear proyecto</Btn>
+              <Btn onClick={() => onResolver("cotizacion")} color={ORANGE} small>📋 Hacer cotización</Btn>
+              <Btn onClick={() => onResolver("no")} color={TEXT_SUB} outline small>✗ No se concretó</Btn>
+            </div>
+          </div>
+        )
+      )}
 
       {/* Estado de publicación: lo primero que la oficina necesita ver, porque
           es lo que decide si los técnicos tienen la tarea o no. */}
@@ -602,8 +647,9 @@ function VistaSemana({ tareas, base, setBase, nombreCliente, abrir }) {
 }
 
 // ── MÓDULO PRINCIPAL ──────────────────────────────────────────────────────────
-export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, sesion }) {
+export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, sesion, onResolverInspeccion }) {
   const [vista, setVista]         = useState("hoy");
+  const [categoria, setCategoria] = useState("todas");
   const [baseSemana, setBaseSemana] = useState(hoy());
   const [detalle, setDetalle]     = useState(null);
   const [form, setForm]           = useState(null);
@@ -620,7 +666,9 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
   // Lo único que decide qué ve un técnico es que esté publicada.
   // No hay filtro por técnico: la lista es la misma para todos. Quién hizo qué
   // se sabe por el cierre y por el autor de cada foto y observación.
-  const visibles = esTecnico ? tareas.filter(estaPublicada) : tareas;
+  const permitidas = esTecnico ? tareas.filter(estaPublicada) : tareas;
+  const visibles = permitidas.filter(t => enCategoria(t, categoria));
+  const cuantas = c => permitidas.filter(t => estaAbierta(t) && enCategoria(t, c)).length;
 
   const deHoy     = visibles.filter(t => t.fecha === hoy()).sort(ordenarPorHora);
   const atrasadas = visibles.filter(estaAtrasada).sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -709,6 +757,9 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
         { value: "todas",  label: "Todas" },
       ]} />
 
+      <Chips value={categoria} onChange={setCategoria} color={ACENTOS.operaciones}
+        opciones={CATEGORIAS.map(c => ({ value: c.value, label: c.value === "todas" ? c.label : `${c.label}${cuantas(c.value) ? ` (${cuantas(c.value)})` : ""}` }))} />
+
 
       {vista === "hoy" && (
         <div>
@@ -771,6 +822,7 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
           onObservacion={texto => agregarObservacion(detalle, texto)}
           onReabrir={() => reabrir(detalle)}
           onPublicar={valor => publicar(detalle, valor)}
+          onResolver={onResolverInspeccion ? r => { onResolverInspeccion(tareas.find(t => t.id === detalle.id) || detalle, r); setDetalle(null); } : null}
           onCerrar={() => setDetalle(null)} />
       )}
 
