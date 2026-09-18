@@ -572,15 +572,18 @@ export default function App() {
     mantenimientosVencidos: tareas.filter(t => t.tipo === "Mantenimiento" && abierta(t) && t.fecha < hoy()).length,
   };
 
+  // En el iPhone, con la app instalada, la página ocupa también la franja de
+  // la hora y la batería: la cabecera se baja lo que mida esa franja para que
+  // sus botones queden donde se pueden tocar.
   const Cabecera = () => (
-    <>
+    <div style={{ position: "sticky", top: 0, zIndex: 100, background: NAVY, paddingTop: "env(safe-area-inset-top)" }}>
     {hayVersionNueva && (
       <button onClick={() => window.location.reload()}
         style={{ width: "100%", background: ORANGE, border: "none", color: "#fff", padding: "11px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
         ⬆️ Hay una versión nueva · toca aquí para actualizar
       </button>
     )}
-    <div style={{ background: NAVY, padding: "14px 20px", boxShadow: "0 2px 12px #0003", position: "sticky", top: 0, zIndex: 100 }}>
+    <div style={{ background: NAVY, padding: "14px 20px", boxShadow: "0 2px 12px #0003" }}>
       <div style={{ maxWidth: 760, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
         <button onClick={() => !esTecnico && setTab("inicio")} style={{ background: "none", border: "none", cursor: esTecnico ? "default" : "pointer", padding: 0, textAlign: "left" }}>
           <h1 style={{ color: "#fff", margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: "-1px" }}>⚡ VICFAN</h1>
@@ -598,7 +601,7 @@ export default function App() {
         </div>
       </div>
     </div>
-    </>
+    </div>
   );
 
   // ── Vista del técnico: solo su día, sin acceso a ventas ni precios ──────────

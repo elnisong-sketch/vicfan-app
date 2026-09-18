@@ -59,6 +59,7 @@ input, select, textarea {
   width: 100%;
   max-width: 520px;
   max-height: 92vh;
+  max-height: calc(100vh - env(safe-area-inset-top) - 16px);
   overflow-y: auto;
 }
 

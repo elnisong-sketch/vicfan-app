@@ -169,7 +169,7 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura, autor }) {
       )}
 
       {ampliada && (
-        <div onClick={() => setAmpliada(null)} style={{ position: "fixed", inset: 0, background: "#000000ee", zIndex: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: 16 }}>
+        <div onClick={() => setAmpliada(null)} style={{ position: "fixed", inset: 0, background: "#000000ee", zIndex: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: 16, paddingTop: "calc(16px + env(safe-area-inset-top))" }}>
           <img src={ampliada.url} alt="" style={{ maxWidth: "100%", maxHeight: "82%", objectFit: "contain" }} />
           <p style={{ margin: 0, color: "#fff", fontSize: 13, textAlign: "center" }}>
             {TIPOS_FOTO.find(t => t.id === ampliada.tipo)?.label || ampliada.tipo}

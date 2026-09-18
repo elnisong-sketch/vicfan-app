@@ -37,7 +37,7 @@ export default function PantallaLogin() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: NAVY, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Inter', 'Helvetica Neue', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: NAVY, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, paddingTop: "calc(24px + env(safe-area-inset-top))", fontFamily: "'Inter', 'Helvetica Neue', sans-serif" }}>
       <div style={{ textAlign: "center", marginBottom: 30 }}>
         <h1 style={{ color: "#fff", margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: "-1.5px" }}>⚡ VICFAN</h1>
         <p style={{ color: "#94b4d4", margin: "2px 0 0", fontSize: 13 }}>Generadores GENERAC</p>
