@@ -6,6 +6,7 @@ import {
   Badge, Btn, Card, Inp, Area, Sel, Modal, Chips, Etiqueta, estiloInput,
 } from "../ui.jsx";
 import { guardarFoto, asegurarFoto, borrarFoto, subirPendientes, contarPendientes } from "../fotos.js";
+import { ModalInspeccion } from "./Inspeccion.jsx";
 
 const ac = ACENTOS.tareas;
 
@@ -67,6 +68,9 @@ const enCategoria = (t, c) => c === "todas" || (c === "otras" ? !PRINCIPALES.inc
 
 export const ORIGENES_INSPECCION = ["Visita comercial", "Incidencia del cliente"];
 export const esIncidencia = t => t.tipo === "Inspección" && t.origen === "Incidencia del cliente";
+// Los dos valores de siempre, con el nombre que usa el equipo en el día a día.
+export const ETIQUETA_ORIGEN = { "Visita comercial": "🏗️ Para proyecto", "Incidencia del cliente": "🩺 Diagnóstico de falla" };
+export const claseInspeccion = t => ETIQUETA_ORIGEN[t.origen] || ETIQUETA_ORIGEN["Visita comercial"];
 export const RESULTADO_COLOR = { "Proyecto": GREEN, "Cotización": ORANGE, "No concretada": TEXT_SUB };
 const estaAtrasada = t => estaAbierta(t) && esPasado(t.fecha);
 // Las tareas anteriores a esta función no tienen el campo, y deben seguir
@@ -206,7 +210,7 @@ function TarjetaTarea({ tarea, nombreCliente, esTecnico, onAbrir, onIniciar, onC
           {!esTecnico && !publicada && <Badge text="Sin publicar" color={TEXT_SUB} small />}
           {atrasada && <Badge text="Atrasada" color={RED} small />}
           {tarea.prioridad !== "Normal" && <Badge text={tarea.prioridad} color={PRIORIDAD_COLOR[tarea.prioridad]} small />}
-          {esIncidencia(tarea) && <Badge text="🚨 Incidencia" color={RED} small />}
+          {tarea.tipo === "Inspección" && <Badge text={claseInspeccion(tarea)} color={esIncidencia(tarea) ? RED : ACENTOS.operaciones} small />}
           {tarea.resultado && <Badge text={tarea.resultado} color={RESULTADO_COLOR[tarea.resultado] || TEXT_SUB} small />}
           {tarea.fotos?.length > 0 && <span style={{ fontSize: 11, color: TEXT_SUB, fontWeight: 700 }}>📷 {tarea.fotos.length}</span>}
         </div>
@@ -248,8 +252,8 @@ function ModalTarea({ form, setForm, clientes, onGuardar, onCerrar }) {
 
       <Sel label="Tipo de tarea" value={form.tipo} onChange={v => set("tipo", v)} options={TIPOS_TAREA.map(t => ({ value: t, label: `${TIPO_ICONO[t]} ${t}` }))} />
       {form.tipo === "Inspección" && (
-        <Sel label="Origen" value={form.origen || ORIGENES_INSPECCION[0]} onChange={v => set("origen", v)}
-          options={ORIGENES_INSPECCION.map(o => ({ value: o, label: o === "Incidencia del cliente" ? "🚨 Incidencia del cliente" : "🤝 Visita comercial" }))} />
+        <Sel label="Clase de inspección" value={form.origen || ORIGENES_INSPECCION[0]} onChange={v => set("origen", v)}
+          options={ORIGENES_INSPECCION.map(o => ({ value: o, label: ETIQUETA_ORIGEN[o] }))} />
       )}
       <Sel label="Cliente" value={form.clienteId} onChange={elegirCliente} options={[{ value: "", label: "— Selecciona —" }, ...clientes.map(c => ({ value: c.id, label: c.nombre }))]} />
 
@@ -468,7 +472,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
         <Badge text={tarea.estado} color={ESTADO_COLOR[tarea.estado] || TEXT_SUB} />
       </div>
       <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}>
-        {esIncidencia(tarea) ? "🚨 Incidencia" : tarea.tipo} · {fechaLarga(tarea.fecha)} · {tarea.hora}
+        {tarea.tipo === "Inspección" ? `Inspección · ${claseInspeccion(tarea)}` : tarea.tipo} · {fechaLarga(tarea.fecha)} · {tarea.hora}
         {tarea.proyectoNombre && <><br /><span style={{ color: ACENTOS.operaciones, fontWeight: 700 }}>🏗️ {tarea.proyectoNombre}</span></>}
       </p>
 
@@ -647,13 +651,14 @@ function VistaSemana({ tareas, base, setBase, nombreCliente, abrir }) {
 }
 
 // ── MÓDULO PRINCIPAL ──────────────────────────────────────────────────────────
-export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, sesion, onResolverInspeccion }) {
+export default function ModuloTareas({ tareas, setTareas, clientes, setClientes, tecnicos, sesion, onResolverInspeccion }) {
   const [vista, setVista]         = useState("hoy");
   const [categoria, setCategoria] = useState("todas");
   const [baseSemana, setBaseSemana] = useState(hoy());
   const [detalle, setDetalle]     = useState(null);
   const [form, setForm]           = useState(null);
   const [cerrando, setCerrando]   = useState(null);
+  const [inspeccion, setInspeccion] = useState(false);
 
   const esTecnico = sesion?.rol === "tecnico";
   const quienActua = sesion?.nombre || "Oficina";
@@ -746,9 +751,12 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>{esTecnico ? "📅 Mi día" : "📅 Tareas"}</h2>
-        {/* Crear tareas es de oficina. Además, una tarea nace sin publicar, así
-            que si la creara un técnico desaparecería de su propia vista. */}
-        {!esTecnico && <Btn onClick={nueva} color={ac} small>+ Nueva</Btn>}
+        {/* Las tareas en general las crea la oficina. Las inspecciones las
+            puede abrir también un técnico: las encuentra él en la calle. */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn onClick={() => setInspeccion(true)} color={ACENTOS.operaciones} small>+ Inspección</Btn>
+          {!esTecnico && <Btn onClick={nueva} color={ac} small>+ Nueva</Btn>}
+        </div>
       </div>
 
       <Chips value={vista} onChange={setVista} color={ac} opciones={[
@@ -804,6 +812,17 @@ export default function ModuloTareas({ tareas, setTareas, clientes, tecnicos, se
         visibles.length > 0
           ? [...visibles].sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora)).map(tarjeta)
           : vacio("Todavía no hay tareas registradas")
+      )}
+
+      {inspeccion && (
+        <ModalInspeccion clientes={clientes} esTecnico={esTecnico} autor={quienActua}
+          onCrearCliente={c => setClientes(p => [...p, c])}
+          onGuardar={f => {
+            setTareas(p => [...p, registrar(f, `Inspección creada (${ETIQUETA_ORIGEN[f.origen]})`, quienActua)]);
+            setInspeccion(false);
+            setCategoria("Inspección");
+          }}
+          onCerrar={() => setInspeccion(false)} />
       )}
 
       {form && (

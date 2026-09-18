@@ -611,7 +611,7 @@ export default function App() {
         <Cabecera />
         <div className="main-content" style={{ maxWidth: 760, margin: "0 auto", paddingBottom: 40 }}>
           <AvisoInstalar />
-          <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} tecnicos={tecnicos} sesion={sesion} />
+          <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} />
         </div>
       </div>
     );
@@ -624,7 +624,7 @@ export default function App() {
 
       <div className="main-content" style={{ maxWidth: 760, margin: "0 auto" }}>
         {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} /></>}
-        {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} tecnicos={tecnicos} sesion={sesion} onResolverInspeccion={resolverInspeccion} />}
+        {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} onResolverInspeccion={resolverInspeccion} />}
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario}
                                      crearProyecto={crearProyecto} onResolverInspeccion={resolverInspeccion} />}

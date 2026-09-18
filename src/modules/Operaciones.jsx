@@ -4,8 +4,8 @@ import {
   hoy, fechaCorta, fechaLarga, sumarDias, esPasado,
   Badge, Btn, Card, Inp, Area, Sel, Modal, Chips, Etiqueta, estiloInput,
 } from "../ui.jsx";
-import { tareaVacia, registrar, estaAbierta, esIncidencia, RESULTADO_COLOR } from "./Tareas.jsx";
-import { NuevoCliente } from "./Cotizaciones.jsx";
+import { registrar, estaAbierta, esIncidencia, claseInspeccion, ETIQUETA_ORIGEN, RESULTADO_COLOR } from "./Tareas.jsx";
+import { SelectorCliente, ModalInspeccion } from "./Inspeccion.jsx";
 import { proyectoVacio, tareaDeProyecto, MESES_MANTENIMIENTO } from "../proyectos.js";
 
 // Proyectos, inspecciones y mantenimientos, en un solo sitio para la oficina.
@@ -18,25 +18,6 @@ import { proyectoVacio, tareaDeProyecto, MESES_MANTENIMIENTO } from "../proyecto
 
 const ac = ACENTOS.operaciones;
 const ICONO = { "Instalación": "🔧", "Mantenimiento": "🔩", "Reparación": "🛠️", "Garantía": "🛡️", "Inspección": "🔍" };
-
-// ── Cliente: elegir uno o crearlo sin salir ────────────────────────────────────
-function SelectorCliente({ clientes, valor, onCambio, onCrear }) {
-  const [creando, setCreando] = useState(false);
-  if (creando) {
-    return <NuevoCliente onCrear={c => { onCrear(c); onCambio(c.id, c); setCreando(false); }} onCancelar={() => setCreando(false)} />;
-  }
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <Etiqueta>Cliente</Etiqueta>
-      <select value={valor} style={estiloInput}
-        onChange={e => e.target.value === "__nuevo__" ? setCreando(true) : onCambio(e.target.value, clientes.find(c => c.id === e.target.value))}>
-        <option value="">— Selecciona un cliente —</option>
-        {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-        <option value="__nuevo__">➕ Crear cliente nuevo…</option>
-      </select>
-    </div>
-  );
-}
 
 // ── Alta de proyecto sin pasar por cotización ──────────────────────────────────
 function ModalProyecto({ clientes, onCrearCliente, inventario, onGuardar, onCerrar }) {
@@ -75,49 +56,6 @@ function ModalProyecto({ clientes, onCrearCliente, inventario, onGuardar, onCerr
 
       <div style={{ display: "flex", gap: 10 }}>
         <Btn onClick={() => onGuardar(f)} color={ac} full disabled={!f.clienteId || !f.nombre.trim()}>Crear proyecto</Btn>
-        <Btn onClick={onCerrar} color={TEXT_SUB} outline full>Cancelar</Btn>
-      </div>
-    </Modal>
-  );
-}
-
-// ── Alta de inspección o incidencia ────────────────────────────────────────────
-function ModalInspeccion({ origen, clientes, onCrearCliente, onGuardar, onCerrar }) {
-  const incidencia = origen === "Incidencia del cliente";
-  const [f, setF] = useState({
-    ...tareaVacia(""),
-    tipo: "Inspección",
-    origen,
-    prioridad: incidencia ? "Alta" : "Normal",
-    // Una incidencia suele ser urgente: se propone publicarla ya. Una visita
-    // comercial se prepara antes, como el resto de tareas.
-    publicada: incidencia,
-  });
-  const set = (k, v) => setF(p => ({ ...p, [k]: v }));
-  const elegirCliente = (id, c) => setF(p => ({ ...p, clienteId: id, direccion: p.direccion || c?.direccion || "" }));
-
-  return (
-    <Modal onClose={onCerrar}>
-      <h3 style={{ margin: "0 0 16px", color: incidencia ? RED : ac }}>{incidencia ? "🚨 Nueva incidencia" : "🔍 Nueva inspección"}</h3>
-      <SelectorCliente clientes={clientes} valor={f.clienteId} onCambio={elegirCliente} onCrear={onCrearCliente} />
-
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
-        <Inp label="Fecha de la visita" type="date" value={f.fecha} onChange={v => set("fecha", v)} />
-        <Inp label="Hora" type="time" value={f.hora} onChange={v => set("hora", v)} />
-      </div>
-      <Inp label="Dirección" value={f.direccion} onChange={v => set("direccion", v)} />
-      <Inp label="Equipo (si lo hay)" value={f.modelo} onChange={v => set("modelo", v)} placeholder="Generac 22kW…" />
-      <Area label={incidencia ? "¿Qué reporta el cliente?" : "Motivo de la visita"} value={f.descripcion} onChange={v => set("descripcion", v)}
-        placeholder={incidencia ? "No arranca, hace ruido, se apaga sola…" : "Evaluar dónde instalar, qué potencia necesita…"} />
-      <Sel label="Prioridad" value={f.prioridad} onChange={v => set("prioridad", v)} options={["Normal", "Alta", "Urgente"].map(p => ({ value: p, label: p }))} />
-
-      <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 600, marginBottom: 16, cursor: "pointer" }}>
-        <input type="checkbox" checked={f.publicada} onChange={e => set("publicada", e.target.checked)} style={{ width: 18, height: 18 }} />
-        Publicarla ya a los técnicos
-      </label>
-
-      <div style={{ display: "flex", gap: 10 }}>
-        <Btn onClick={() => onGuardar(f)} color={incidencia ? RED : ac} full disabled={!f.clienteId}>Crear</Btn>
         <Btn onClick={onCerrar} color={TEXT_SUB} outline full>Cancelar</Btn>
       </div>
     </Modal>
@@ -217,7 +155,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
   const cerrados = proyectos.filter(p => p.estado === "Cerrado");
 
   const guardarInspeccion = f => {
-    setTareas(p => [...p, registrar(f, esIncidencia(f) ? "Incidencia registrada" : "Inspección creada", "Oficina")]);
+    setTareas(p => [...p, registrar(f, `Inspección creada (${ETIQUETA_ORIGEN[f.origen]})`, "Oficina")]);
     setModal(null);
     setVista("inspecciones");
   };
@@ -234,7 +172,10 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
     <Card key={t.id} style={{ borderLeft: `4px solid ${esIncidencia(t) ? RED : ac}`, padding: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
         <div style={{ minWidth: 0 }}>
-          <p style={{ margin: "0 0 3px", fontWeight: 700 }}>{esIncidencia(t) ? "🚨" : "🔍"} {nombreCliente(t.clienteId)}</p>
+          <p style={{ margin: "0 0 3px", fontWeight: 700 }}>{esIncidencia(t) ? "🩺" : "🔍"} {nombreCliente(t.clienteId)}</p>
+          <p style={{ margin: "0 0 2px", fontSize: 12, fontWeight: 700, color: esIncidencia(t) ? RED : ac }}>
+            {claseInspeccion(t)}{t.creadaPor && t.creadaPor !== "Oficina" ? ` · abierta por 👷 ${t.creadaPor}` : ""}
+          </p>
           <p style={{ margin: 0, fontSize: 12.5, color: TEXT_SUB }}>{fechaCorta(t.fecha)} · {t.hora}{t.descripcion ? ` · ${t.descripcion.slice(0, 60)}` : ""}</p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
@@ -306,8 +247,8 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
 
       {vista === "inspecciones" && <>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-          <Btn onClick={() => setModal("Visita comercial")} color={ac} small>🔍 Nueva inspección</Btn>
-          <Btn onClick={() => setModal("Incidencia del cliente")} color={RED} small>🚨 Incidencia</Btn>
+          <Btn onClick={() => setModal("Visita comercial")} color={ac} small>🏗️ Inspección para proyecto</Btn>
+          <Btn onClick={() => setModal("Incidencia del cliente")} color={RED} small>🩺 Diagnóstico de falla</Btn>
         </div>
         {inspecciones.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>Sin inspecciones todavía.</p>}
         {seccion("Por resolver", porResolver, tarjetaInspeccion, ORANGE)}

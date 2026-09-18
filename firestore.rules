@@ -54,9 +54,18 @@ service cloud.firestore {
 
     // ── Tareas ────────────────────────────────────────────────────────────────
     // El técnico solo ve las publicadas, y solo puede documentar su trabajo.
+    // Un técnico solo puede abrir inspecciones: visibles para todos, sin
+    // importes y sin colgarlas de un proyecto. Lo demás lo decide la oficina.
+    function inspeccionDeTecnico() {
+      let t = request.resource.data;
+      return t.tipo == 'Inspección' && t.publicada == true && t.estado == 'Programada'
+        && t.get('costo', 0) == 0 && !('proyectoId' in t);
+    }
+
     match /vicfan_tareas/{id} {
       allow read:   if esOficina() || (esTecnico() && resource.data.publicada == true);
-      allow create, delete: if esOficina();
+      allow create: if esOficina() || (esTecnico() && inspeccionDeTecnico());
+      allow delete: if esOficina();
       allow update: if esOficina()
                     || (esTecnico() && resource.data.publicada == true && soloCamposDeCampo());
     }
@@ -83,7 +92,9 @@ service cloud.firestore {
     // ── Datos de apoyo ────────────────────────────────────────────────────────
     // El técnico necesita leer a qué cliente va y qué equipo lleva, pero no
     // puede modificarlos.
-    match /vicfan_clientes/{id}   { allow read: if autenticado(); allow write: if esOficina(); }
+    // Un técnico puede dar de alta un cliente nuevo al abrir una inspección,
+    // pero no modificar ni borrar los que ya existen.
+    match /vicfan_clientes/{id}   { allow read: if autenticado(); allow create: if esOficina() || esTecnico(); allow update, delete: if esOficina(); }
     match /vicfan_inventario/{id} { allow read: if autenticado(); allow write: if esOficina(); }
     match /vicfan_repuestos/{id}  { allow read: if autenticado(); allow write: if esOficina(); }
     match /vicfan_garantias/{id}  { allow read: if autenticado(); allow write: if esOficina(); }
