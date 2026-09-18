@@ -56,10 +56,14 @@ service cloud.firestore {
     // El técnico solo ve las publicadas, y solo puede documentar su trabajo.
     // Un técnico solo puede abrir inspecciones: visibles para todos, sin
     // importes y sin colgarlas de un proyecto. Lo demás lo decide la oficina.
+    // Escrita a la antigua (sin let, get ni tildes) a propósito: la primera
+    // versión se publicó sin errores pero denegaba siempre.
     function inspeccionDeTecnico() {
-      let t = request.resource.data;
-      return t.tipo == 'Inspección' && t.publicada == true && t.estado == 'Programada'
-        && t.get('costo', 0) == 0 && !('proyectoId' in t);
+      return request.resource.data.tipo.matches('Inspecci.+n')
+        && request.resource.data.publicada == true
+        && request.resource.data.estado == 'Programada'
+        && !request.resource.data.keys().hasAny(['proyectoId'])
+        && (!request.resource.data.keys().hasAny(['costo']) || request.resource.data.costo == 0);
     }
 
     match /vicfan_tareas/{id} {
