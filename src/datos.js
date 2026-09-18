@@ -47,9 +47,6 @@ export function useColeccion(nombre, semilla, activa = true, filtro = null) {
   // El arranque es siempre local: la app tiene que abrir y funcionar sin red.
   const [items, setItems] = useState(() => cargarLS(claveLS, typeof semilla === "function" ? semilla() : semilla));
 
-  const itemsRef = useRef(items);
-  itemsRef.current = items;
-
   // Último estado que sabemos que está en Firestore. Sirve para calcular qué
   // cambió de verdad y mandar solo eso. `null` = todavía no hemos hablado con
   // la nube, así que no se sube nada (no vaya a pisar algo más nuevo).
@@ -67,15 +64,10 @@ export function useColeccion(nombre, semilla, activa = true, filtro = null) {
     const unsub = onSnapshot(consulta, snap => {
       const remotos = snap.docs.map(d => d.data());
 
-      // Primera conexión con la nube vacía: este equipo la siembra con lo que
-      // tenga. Marcar enNube como vacío hace que el efecto de subida detecte
-      // todos los registros como nuevos y los envíe.
-      if (enNube.current === null && remotos.length === 0 && itemsRef.current.length > 0) {
-        enNube.current = [];
-        setItems(actual => [...actual]);
-        return;
-      }
-
+      // La nube manda siempre, también cuando está vacía. Antes, si un equipo
+      // la encontraba vacía la "sembraba" con lo que tuviera guardado, y eso
+      // hacía imposible dejar la base a cero: el primer móvil que abriera la
+      // app volvía a subir los datos viejos.
       enNube.current = remotos;
       setItems(actual => igual(actual, remotos) ? actual : remotos);
     }, () => {});

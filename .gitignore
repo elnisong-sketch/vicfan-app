@@ -27,3 +27,6 @@ dist-ssr
 /logo.png
 /Standby Generator*.png
 .imagenes.tmp.json
+
+# Copias de seguridad con datos de clientes: nunca al repositorio
+backup-vicfan-*.json

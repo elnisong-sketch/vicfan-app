@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useColeccion } from "./datos.js";
 import {
   NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB,
-  ACENTOS, ESTADO_COLOR, hoy, dn, usd, uid, cargarLS,
+  ACENTOS, ESTADO_COLOR, hoy, usd, uid,
   Badge, Btn, Card, Inp, Sel, Modal, CampoImagen,
 } from "./ui.jsx";
 import { prepararImagen, prepararLogo } from "./imagenes.js";
@@ -23,87 +23,6 @@ const TABS = [
   { id: "garantias",    icon: "🛡️", label: "Garantías" },
   { id: "admin",        icon: "⚙️", label: "Admin" },
 ];
-
-// ── DATOS DEMO ────────────────────────────────────────────────────────────────
-const MODELOS_DEMO = [
-  { id: "g1", codigo: "GP3600",   nombre: "GENERAC GP3600",       potencia: "3600W",  combustible: "Gasolina",    precio: 850,  stock: 4 },
-  { id: "g2", codigo: "GP5500",   nombre: "GENERAC GP5500",       potencia: "5500W",  combustible: "Gasolina",    precio: 1100, stock: 3 },
-  { id: "g3", codigo: "GP8000E",  nombre: "GENERAC GP8000E",      potencia: "8000W",  combustible: "Gasolina",    precio: 1450, stock: 2 },
-  { id: "g4", codigo: "XC8000E",  nombre: "GENERAC XC8000E",      potencia: "8000W",  combustible: "Gasolina",    precio: 1800, stock: 2 },
-  { id: "g5", codigo: "RG022N",   nombre: "GENERAC Standby 22kW", potencia: "22000W", combustible: "Gas/Propano", precio: 4200, stock: 1 },
-];
-const REPUESTOS_DEMO = [
-  { id: "r1", codigo: "BUJIA-GP",      nombre: "Bujía GENERAC GP",     precio: 8,  stock: 20 },
-  { id: "r2", codigo: "FILTRO-ACEITE", nombre: "Filtro de aceite",     precio: 12, stock: 15 },
-  { id: "r3", codigo: "FILTRO-AIRE",   nombre: "Filtro de aire",       precio: 18, stock: 10 },
-  { id: "r4", codigo: "CARB-GP3600",   nombre: "Carburador GP3600",    precio: 45, stock: 5  },
-  { id: "r5", codigo: "BATERIA-12V",   nombre: "Batería 12V arranque", precio: 65, stock: 8  },
-];
-const CLIENTES_DEMO = [
-  { id: "c1", nombre: "Carlos Mendoza",      telefono: "0412-555-1234", email: "carlos@email.com",     direccion: "Urb. Las Mercedes, Caracas", tipo: "Residencial", notas: "" },
-  { id: "c2", nombre: "Ferretería El Perno", telefono: "0212-555-6789", email: "ferreteria@email.com", direccion: "Av. Principal, Valencia",    tipo: "Comercial",   notas: "Compras frecuentes de repuestos" },
-  { id: "c3", nombre: "María Rodríguez",     telefono: "0424-555-4321", email: "",                     direccion: "Res. La Castellana, Caracas", tipo: "Residencial", notas: "" },
-  { id: "c4", nombre: "Clínica San Lucas",   telefono: "0261-555-8888", email: "admin@sanlucas.com",   direccion: "Av. Delicias, Maracaibo",    tipo: "Industrial",  notas: "Requiere garantía extendida" },
-  { id: "c5", nombre: "Pedro Álvarez",       telefono: "0416-555-9999", email: "",                     direccion: "Urb. El Bosque, Valencia",   tipo: "Residencial", notas: "" },
-];
-const COTIZACIONES_DEMO = [
-  { id: "q1", clienteId: "c1", fecha: dn(5), estado: "Pendiente", items: [{ id: "a1", tipo: "planta", nombre: "GENERAC GP5500", cantidad: 1, precio: 1100, subtotal: 1100 }, { id: "a2", tipo: "servicio", nombre: "Instalación eléctrica", cantidad: 1, precio: 150, subtotal: 150 }], total: 1250, notas: "Cliente interesado" },
-  { id: "q2", clienteId: "c4", fecha: dn(3), estado: "Aprobada",  items: [{ id: "b1", tipo: "planta", nombre: "GENERAC Standby 22kW", cantidad: 1, precio: 4200, subtotal: 4200 }, { id: "b2", tipo: "servicio", nombre: "Instalación eléctrica", cantidad: 1, precio: 800, subtotal: 800 }], total: 5000, notas: "Instalación urgente" },
-  { id: "q3", clienteId: "c3", fecha: dn(1), estado: "Pendiente", items: [{ id: "d1", tipo: "planta", nombre: "GENERAC GP3600", cantidad: 1, precio: 850, subtotal: 850 }, { id: "d2", tipo: "servicio", nombre: "Instalación eléctrica", cantidad: 1, precio: 120, subtotal: 120 }], total: 970, notas: "" },
-];
-const VENTAS_DEMO = [
-  { id: "v1", clienteId: "c2", fecha: dn(10), estado: "Cobrada",         items: [{ nombre: "Bujía GENERAC GP", cantidad: 4, precio: 8, subtotal: 32 }],       total: 32,   formaPago: "Transferencia", notas: "" },
-  { id: "v2", clienteId: "c5", fecha: dn(7),  estado: "Cobrada",         items: [{ nombre: "GENERAC GP8000E", cantidad: 1, precio: 1450, subtotal: 1450 }],   total: 1600, formaPago: "Efectivo USD",  notas: "Incluye instalación básica" },
-  { id: "v3", clienteId: "c4", fecha: dn(2),  estado: "Pendiente cobro", items: [{ nombre: "GENERAC Standby 22kW", cantidad: 1, precio: 4200, subtotal: 4200 }], total: 5000, formaPago: "Transferencia", notas: "" },
-];
-const TECNICOS_DEMO = [
-  { id: "t1", nombre: "Técnico 1", telefono: "", especialidad: "Instalación",   pin: "1234" },
-  { id: "t2", nombre: "Técnico 2", telefono: "", especialidad: "Mantenimiento", pin: "0000" },
-];
-const GARANTIAS_DEMO = [
-  { id: "ga1", clienteId: "c5", modelo: "GENERAC GP8000E", serial: "SN-2024-001", fechaInstalacion: dn(6), mesesGarantia: 24, notas: "" },
-];
-
-// Semillas antiguas: solo se usan para construir las tareas la primera vez.
-const INSTALACIONES_PREVIAS = [
-  { id: "i1", clienteId: "c5", tecnicoId: "t1", fechaProgramada: dn(6), estado: "Completada", modelo: "GENERAC GP8000E",      direccion: "Urb. El Bosque, Valencia", notas: "Instalación exitosa" },
-  { id: "i2", clienteId: "c4", tecnicoId: "t1", fechaProgramada: hoy(), estado: "Programada", modelo: "GENERAC Standby 22kW", direccion: "Av. Delicias, Maracaibo",  notas: "Requiere revisión eléctrica previa" },
-];
-const SERVICIOS_PREVIOS = [
-  { id: "s1", clienteId: "c2", tipo: "Mantenimiento", fecha: dn(4), tecnicoId: "t2", modelo: "GENERAC GP5500", descripcion: "Cambio de aceite y filtros", costo: 80, estado: "Completado" },
-];
-
-// ── MIGRACIÓN A TAREAS ────────────────────────────────────────────────────────
-// Instalaciones y Servicios eran dos módulos casi idénticos. Ahora son un solo
-// tipo de Tarea. Esto corre una sola vez: los arreglos originales quedan
-// intactos en localStorage por si hiciera falta volver atrás.
-const normalizarEstado = e => (e === "Completado" ? "Completada" : e || "Programada");
-
-const desdeInstalacion = i => ({
-  id: i.id, tipo: "Instalación", clienteId: i.clienteId, tecnicoId: i.tecnicoId || "",
-  fecha: i.fechaProgramada || hoy(), hora: "09:00", duracionDias: 1,
-  estado: normalizarEstado(i.estado), prioridad: "Normal",
-  modelo: i.modelo || "", direccion: i.direccion || "", descripcion: "",
-  costo: 0, notas: i.notas || "", fotos: [], historial: [], cierre: null,
-  creadaEn: new Date().toISOString(),
-});
-
-const desdeServicio = s => ({
-  id: s.id, tipo: s.tipo || "Mantenimiento", clienteId: s.clienteId, tecnicoId: s.tecnicoId || "",
-  fecha: s.fecha || hoy(), hora: "09:00", duracionDias: 1,
-  estado: normalizarEstado(s.estado), prioridad: "Normal",
-  modelo: s.modelo || "", direccion: "", descripcion: s.descripcion || "",
-  costo: s.costo || 0, notas: "", fotos: [], historial: [], cierre: null,
-  creadaEn: new Date().toISOString(),
-});
-
-const cargarTareas = () => {
-  const guardadas = cargarLS("vf_tareas", null);
-  if (guardadas) return guardadas;
-  const inst = cargarLS("vf_instalaciones", INSTALACIONES_PREVIAS) || [];
-  const serv = cargarLS("vf_servicios", SERVICIOS_PREVIOS) || [];
-  return [...inst.map(desdeInstalacion), ...serv.map(desdeServicio)];
-};
 
 // ── CLIENTES ──────────────────────────────────────────────────────────────────
 function ModuloClientes({ clientes, setClientes }) {
@@ -278,10 +197,9 @@ function ModuloGarantias({ garantias, clientes }) {
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
-function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, cargarDemo, empresa, setEmpresa, correo }) {
+function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, empresa, setEmpresa, correo }) {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({});
-  const [confirmDemo, setConfirmDemo] = useState(false);
   const [editandoEmpresa, setEditandoEmpresa] = useState(false);
   const [borradorEmpresa, setBorradorEmpresa] = useState({});
   const [copia, setCopia] = useState(null);   // backup leído, a la espera de confirmación
@@ -333,18 +251,7 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, car
           </div>
         </div>
       )}
-      {!confirmDemo ? (
-        <button onClick={() => setConfirmDemo(true)} style={{ width: "100%", background: BG_CARD, border: `1px dashed ${BORDER}`, borderRadius: 12, color: TEXT_SUB, padding: "11px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 20 }}>🧪 Cargar datos de prueba</button>
-      ) : (
-        <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 12, padding: 14, marginBottom: 20 }}>
-          <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#856404" }}>⚠️ Reemplazará todos los datos con datos ficticios.</p>
-          <div style={{ display: "flex", gap: 8 }}>
-            <Btn onClick={() => { cargarDemo(); setConfirmDemo(false); }} color={ORANGE} full small>Sí, cargar demo</Btn>
-            <Btn onClick={() => setConfirmDemo(false)} color={TEXT_SUB} outline full small>Cancelar</Btn>
-          </div>
-        </div>
-      )}
-      <h3 style={{ margin: "0 0 10px", fontSize: 15 }}>🏢 Datos del presupuesto</h3>
+      <h3 style={{ margin: "20px 0 10px", fontSize: 15 }}>🏢 Datos del presupuesto</h3>
       <Card>
         {!editandoEmpresa ? (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
@@ -460,18 +367,18 @@ export default function App() {
   const conectado = !!sesion;
   const esOficina = sesion?.rol === "admin";
 
-  const [clientes, setClientes]         = useColeccion("clientes", CLIENTES_DEMO, conectado);
-  const [cotizaciones, setCotizaciones] = useColeccion("cotizaciones", COTIZACIONES_DEMO, esOficina);
-  const [ventas, setVentas]             = useColeccion("ventas", VENTAS_DEMO, esOficina);
+  const [clientes, setClientes]         = useColeccion("clientes", [], conectado);
+  const [cotizaciones, setCotizaciones] = useColeccion("cotizaciones", [], esOficina);
+  const [ventas, setVentas]             = useColeccion("ventas", [], esOficina);
   // El técnico pide solo las publicadas. No es cosmético: las reglas le niegan
   // el resto, y pedir la colección entera haría que se denegara toda la
   // consulta, dejándole sin ninguna tarea.
-  const [tareas, setTareas]             = useColeccion("tareas", cargarTareas, conectado,
+  const [tareas, setTareas]             = useColeccion("tareas", [], conectado,
                                             esOficina ? null : ["publicada", true]);
-  const [inventario, setInventario]     = useColeccion("inventario", MODELOS_DEMO, conectado);
-  const [repuestos, setRepuestos]       = useColeccion("repuestos", REPUESTOS_DEMO, conectado);
-  const [garantias, setGarantias]       = useColeccion("garantias", GARANTIAS_DEMO, conectado);
-  const [tecnicos, setTecnicos]         = useColeccion("tecnicos", TECNICOS_DEMO, conectado);
+  const [inventario, setInventario]     = useColeccion("inventario", [], conectado);
+  const [repuestos, setRepuestos]       = useColeccion("repuestos", [], conectado);
+  const [garantias, setGarantias]       = useColeccion("garantias", [], conectado);
+  const [tecnicos, setTecnicos]         = useColeccion("tecnicos", [], conectado);
   // Membrete del presupuesto: una sola ficha, pero se sincroniza igual que el
   // resto para que ambos dispositivos emitan con los mismos datos.
   const [empresaLista, setEmpresaLista] = useColeccion("empresa", [EMPRESA_POR_DEFECTO], esOficina);
@@ -481,13 +388,6 @@ export default function App() {
   const hayVersionNueva = useNuevaVersion();
 
 
-
-  const cargarDemo = () => {
-    setClientes(CLIENTES_DEMO); setCotizaciones(COTIZACIONES_DEMO); setVentas(VENTAS_DEMO);
-    setTareas([...INSTALACIONES_PREVIAS.map(desdeInstalacion), ...SERVICIOS_PREVIOS.map(desdeServicio)]);
-    setInventario(MODELOS_DEMO); setRepuestos(REPUESTOS_DEMO);
-    setGarantias(GARANTIAS_DEMO); setTecnicos(TECNICOS_DEMO);
-  };
 
   // Lo que la tarea hereda del presupuesto. Se calcula aparte porque se usa al
   // aprobar y también cada vez que la cotización se modifica después.
@@ -644,7 +544,7 @@ export default function App() {
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
-        {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos} cargarDemo={cargarDemo}
+        {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos}
           empresa={empresa} setEmpresa={d => setEmpresaLista([d])} correo={sesion.correo} />}
       </div>
 
