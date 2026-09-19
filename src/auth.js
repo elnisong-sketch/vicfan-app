@@ -3,6 +3,7 @@ import { initializeApp, deleteApp } from "firebase/app";
 import {
   getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
+  updatePassword, reauthenticateWithCredential, EmailAuthProvider,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, deleteDoc, collection, onSnapshot } from "firebase/firestore";
 import { app, db, firebaseConfig } from "./firebase";
@@ -38,6 +39,7 @@ export function mensajeDeError(codigo) {
     case "auth/user-not-found":
     case "auth/wrong-password":
     case "auth/invalid-credential":     return "Correo o contraseña incorrectos.";
+    case "auth/requires-recent-login":  return "Por seguridad, sal de la app, vuelve a entrar e inténtalo otra vez.";
     case "auth/user-disabled":          return "Esta cuenta está desactivada. Habla con la oficina.";
     case "auth/too-many-requests":      return "Demasiados intentos fallidos. Espera unos minutos.";
     case "auth/network-request-failed": return "Sin conexión. Comprueba tus datos móviles.";
@@ -76,6 +78,36 @@ export async function crearUsuario({ correo, clave, nombre, rol }) {
     rol: rol === "admin" ? "admin" : "tecnico",
     creadoEn: new Date().toISOString(),
   });
+}
+
+/**
+ * Cambia la contraseña de una cuenta.
+ *
+ * Desde el navegador Firebase solo deja cambiar la contraseña a quien ha
+ * entrado con ella; cambiar la de otro sin conocerla exige un servidor propio,
+ * que el plan gratuito no incluye. Por eso se pide la actual: con ella se
+ * entra como esa persona en una instancia aparte —igual que al dar de alta—
+ * y se cambia, sin tocar la sesión de quien lo está haciendo.
+ *
+ * Si la cuenta es la propia se hace sobre la sesión principal, para no
+ * quedarse fuera de la app justo después de cambiarla.
+ */
+export async function cambiarClave({ correo, actual, nueva }) {
+  const propio = auth.currentUser;
+  if (propio && normalizar(propio.email) === normalizar(correo)) {
+    await reauthenticateWithCredential(propio, EmailAuthProvider.credential(propio.email, actual));
+    await updatePassword(propio, nueva);
+    return;
+  }
+  const secundaria = initializeApp(firebaseConfig, `clave-${Date.now()}`);
+  try {
+    const authSec = getAuth(secundaria);
+    const { user } = await signInWithEmailAndPassword(authSec, normalizar(correo), actual);
+    await updatePassword(user, nueva);
+    await signOut(authSec).catch(() => {});
+  } finally {
+    await deleteApp(secundaria).catch(() => {});
+  }
 }
 
 /**
