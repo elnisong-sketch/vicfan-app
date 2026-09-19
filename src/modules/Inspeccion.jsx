@@ -16,15 +16,22 @@ export function SelectorCliente({ clientes, valor, onCambio, onCrear }) {
   if (creando) {
     return <NuevoCliente onCrear={c => { onCrear(c); onCambio(c.id, c); setCreando(false); }} onCancelar={() => setCreando(false)} />;
   }
+  // El alta va en un botón aparte y no como opción de la lista: en algunos
+  // Android el selector nativo no avisa del cambio al elegir esa opción.
   return (
     <div style={{ marginBottom: 14 }}>
       <Etiqueta>Cliente</Etiqueta>
-      <select value={valor} style={estiloInput}
-        onChange={e => e.target.value === "__nuevo__" ? setCreando(true) : onCambio(e.target.value, clientes.find(c => c.id === e.target.value))}>
-        <option value="">— Selecciona un cliente —</option>
-        {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-        <option value="__nuevo__">➕ Crear cliente nuevo…</option>
-      </select>
+      <div style={{ display: "flex", gap: 8 }}>
+        <select value={valor} style={{ ...estiloInput, flex: 1, minWidth: 0 }}
+          onChange={e => onCambio(e.target.value, clientes.find(c => c.id === e.target.value))}>
+          <option value="">{clientes.length ? "— Selecciona un cliente —" : "— Aún no hay clientes —"}</option>
+          {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+        <button type="button" onClick={() => setCreando(true)}
+          style={{ flex: "0 0 auto", background: ACENTOS.clientes || ac, color: "#fff", border: "none", borderRadius: 10, padding: "0 14px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+          ➕ Nuevo
+        </button>
+      </div>
     </div>
   );
 }

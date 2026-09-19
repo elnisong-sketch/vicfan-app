@@ -6,7 +6,7 @@ import {
   Badge, Btn, Card, Inp, Area, Sel, Modal, Chips, Etiqueta, estiloInput,
 } from "../ui.jsx";
 import { guardarFoto, asegurarFoto, borrarFoto, subirPendientes, contarPendientes } from "../fotos.js";
-import { ModalInspeccion } from "./Inspeccion.jsx";
+import { ModalInspeccion, SelectorCliente } from "./Inspeccion.jsx";
 
 const ac = ACENTOS.tareas;
 
@@ -236,13 +236,14 @@ function TarjetaTarea({ tarea, nombreCliente, esTecnico, onAbrir, onIniciar, onC
 }
 
 // ── MODAL: CREAR / EDITAR ─────────────────────────────────────────────────────
-function ModalTarea({ form, setForm, clientes, onGuardar, onCerrar }) {
+function ModalTarea({ form, setForm, clientes, onCrearCliente, onGuardar, onCerrar }) {
   const cliente = clientes.find(c => c.id === form.clienteId);
   const set = (campo, v) => setForm(f => ({ ...f, [campo]: v }));
 
   // Al elegir cliente, se hereda su dirección si la tarea aún no tiene una.
-  const elegirCliente = v => {
-    const c = clientes.find(x => x.id === v);
+  // El cliente recién creado todavía no está en la lista: llega aparte.
+  const elegirCliente = (v, nuevo) => {
+    const c = nuevo || clientes.find(x => x.id === v);
     setForm(f => ({ ...f, clienteId: v, direccion: f.direccion || c?.direccion || "" }));
   };
 
@@ -255,7 +256,7 @@ function ModalTarea({ form, setForm, clientes, onGuardar, onCerrar }) {
         <Sel label="Clase de inspección" value={form.origen || ORIGENES_INSPECCION[0]} onChange={v => set("origen", v)}
           options={ORIGENES_INSPECCION.map(o => ({ value: o, label: ETIQUETA_ORIGEN[o] }))} />
       )}
-      <Sel label="Cliente" value={form.clienteId} onChange={elegirCliente} options={[{ value: "", label: "— Selecciona —" }, ...clientes.map(c => ({ value: c.id, label: c.nombre }))]} />
+      <SelectorCliente clientes={clientes} valor={form.clienteId} onCambio={elegirCliente} onCrear={onCrearCliente} />
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
         <Inp label="Fecha" type="date" value={form.fecha} onChange={v => set("fecha", v)} />
@@ -826,7 +827,7 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
       )}
 
       {form && (
-        <ModalTarea form={form} setForm={setForm} clientes={clientes}
+        <ModalTarea form={form} setForm={setForm} clientes={clientes} onCrearCliente={c => setClientes(p => [...p, c])}
           onGuardar={guardar} onCerrar={() => setForm(null)} />
       )}
 

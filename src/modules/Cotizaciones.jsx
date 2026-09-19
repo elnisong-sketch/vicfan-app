@@ -437,13 +437,19 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
           ) : (
             <>
               <Etiqueta>Nombre o razón social</Etiqueta>
-              <select value={form.clienteId}
-                onChange={e => e.target.value === "__nuevo__" ? setCreandoCliente(true) : set("clienteId", e.target.value)}
-                style={{ ...estiloInput, marginBottom: cliente ? 6 : 14 }}>
-                <option value="">— Selecciona un cliente —</option>
-                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                <option value="__nuevo__">➕ Crear cliente nuevo…</option>
-              </select>
+              {/* Botón aparte: en algunos Android el selector nativo no avisa
+                  del cambio si el alta va como una opción más de la lista. */}
+              <div style={{ display: "flex", gap: 8, marginBottom: cliente ? 6 : 14 }}>
+                <select value={form.clienteId} onChange={e => set("clienteId", e.target.value)}
+                  style={{ ...estiloInput, flex: 1, minWidth: 0 }}>
+                  <option value="">{clientes.length ? "— Selecciona un cliente —" : "— Aún no hay clientes —"}</option>
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </select>
+                <button type="button" onClick={() => setCreandoCliente(true)}
+                  style={{ flex: "0 0 auto", background: ACENTOS.clientes, color: "#fff", border: "none", borderRadius: 10, padding: "0 14px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                  ➕ Nuevo
+                </button>
+              </div>
               {cliente && (
                 <p style={{ margin: "0 0 14px", fontSize: 12, color: TEXT_SUB, lineHeight: 1.5 }}>
                   {cliente.documento || "sin C.I./RIF"}{cliente.direccion ? ` · ${cliente.direccion}` : ""}
