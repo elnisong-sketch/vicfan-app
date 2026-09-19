@@ -180,7 +180,7 @@ function LineasItems({ items, onCambio, inventario, repuestos }) {
     // Se guarda el id del modelo, no solo su nombre: así la foto sigue
     // encontrándose aunque después se renombre el equipo en el inventario.
     if (origen === "planta")    { const m = inventario[indice]; base = { modeloId: m.id, nombre: m.nombre, detalle: m.potencia ? `${m.potencia} · ${m.combustible}` : "", precio: m.precio }; }
-    if (origen === "repuesto")  { const r = repuestos[indice];  base = { nombre: r.nombre, detalle: "", precio: r.precio }; }
+    if (origen === "repuesto")  { const r = repuestos[indice];  base = { repuestoId: r.id, nombre: r.nombre, detalle: "", precio: r.precio }; }
     if (origen === "servicio")  { const s = SERVICIOS_CATALOGO[indice]; base = { nombre: s.nombre, detalle: s.detalle, precio: s.precio }; }
     if (origen === "libre")     { base = { nombre: "", detalle: "", precio: 0 }; }
 
@@ -191,8 +191,10 @@ function LineasItems({ items, onCambio, inventario, repuestos }) {
   // Cambiar cantidad o precio recalcula el total de esa línea, como en el papel.
   const editar = (id, campo, valor) => onCambio(items.map(i => {
     if (i.id !== id) return i;
-    const act = { ...i, [campo]: campo === "cantidad" || campo === "precio" ? Number(valor) || 0 : valor };
-    act.subtotal = act.cantidad * act.precio;
+    // Se guarda tal cual se escribe (para poder borrar dígitos); el subtotal se
+    // calcula con el número, y al guardar la cotización se normaliza.
+    const act = { ...i, [campo]: valor };
+    act.subtotal = (Number(act.cantidad) || 0) * (Number(act.precio) || 0);
     return act;
   }));
 
@@ -312,7 +314,8 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
 
   const guardar = () => {
     if (!form.clienteId || form.items.length === 0) return;
-    setCotizaciones(p => p.find(x => x.id === form.id) ? p.map(x => x.id === form.id ? form : x) : [...p, form]);
+    const limpio = { ...form, items: form.items.map(i => ({ ...i, cantidad: Number(i.cantidad) || 0, precio: Number(i.precio) || 0 })) };
+    setCotizaciones(p => p.find(x => x.id === limpio.id) ? p.map(x => x.id === limpio.id ? limpio : x) : [...p, limpio]);
     // Si ya generó tarea, esta arrastra el nuevo alcance. Normalmente ocurre
     // antes de publicarla a los técnicos, pero si ya estuviera publicada el
     // cambio queda anotado en su historial igualmente.

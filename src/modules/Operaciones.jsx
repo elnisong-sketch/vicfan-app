@@ -7,6 +7,7 @@ import {
 import { registrar, estaAbierta, esIncidencia, claseInspeccion, ETIQUETA_ORIGEN, RESULTADO_COLOR } from "./Tareas.jsx";
 import { SelectorCliente, ModalInspeccion } from "./Inspeccion.jsx";
 import { proyectoVacio, tareaDeProyecto, MESES_MANTENIMIENTO, MESES_GARANTIA, diasHasta, garantiaDeProyecto } from "../proyectos.js";
+import { resumenMaterial } from "../inventario.js";
 
 // Proyectos, inspecciones y mantenimientos, en un solo sitio para la oficina.
 //
@@ -108,12 +109,13 @@ function BloqueGarantia({ garantia, onActivar, onAnular }) {
   );
 }
 
-function DetalleProyecto({ proyecto, tareas, garantia, nombreCliente, onVisita, onCerrarProyecto, onReabrir, onMeses, onActivarGarantia, onAnularGarantia, onCerrar }) {
+function DetalleProyecto({ proyecto, tareas, garantia, nombreCliente, onVisita, onCerrarProyecto, onReabrir, onMeses, onActivarGarantia, onAnularGarantia, onCancelarProyecto, onCerrar }) {
   const [tipoVisita, setTipoVisita] = useState("Reparación");
   const [fechaVisita, setFechaVisita] = useState(hoy());
   const suyas = tareas.filter(t => t.proyectoId === proyecto.id).sort((a, b) => a.fecha.localeCompare(b.fecha));
   const proximo = suyas.find(t => t.tipo === "Mantenimiento" && estaAbierta(t));
   const cerrado = proyecto.estado === "Cerrado";
+  const cancelado = proyecto.estado === "Cancelado";
 
   return (
     <Modal onClose={onCerrar}>
@@ -130,6 +132,7 @@ function DetalleProyecto({ proyecto, tareas, garantia, nombreCliente, onVisita, 
         {proyecto.direccion && <div>📍 <b>Dirección:</b> {proyecto.direccion}</div>}
         {proyecto.descripcion && <div style={{ whiteSpace: "pre-line" }}>📝 {proyecto.descripcion}</div>}
         <div>🔩 <b>Próximo mantenimiento:</b> {proximo ? fechaLarga(proximo.fecha) : cerrado ? "—" : "se programa al cerrar el proyecto"}</div>
+        {proyecto.consumoStock?.length > 0 && <div>📦 <b>Material descontado:</b> {resumenMaterial(proyecto.consumoStock)}</div>}
       </div>
 
       <BloqueGarantia garantia={garantia} onActivar={onActivarGarantia} onAnular={onAnularGarantia} />
@@ -170,7 +173,8 @@ function DetalleProyecto({ proyecto, tareas, garantia, nombreCliente, onVisita, 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {cerrado
           ? <Btn onClick={onReabrir} color={ORANGE} outline small>↺ Reabrir proyecto</Btn>
-          : <Btn onClick={onCerrarProyecto} color={GREEN} small>✓ Cerrar proyecto</Btn>}
+          : !cancelado && <Btn onClick={onCerrarProyecto} color={GREEN} small>✓ Cerrar proyecto</Btn>}
+        {!cerrado && !cancelado && <Btn onClick={onCancelarProyecto} color={RED} outline small>✗ Cancelar proyecto</Btn>}
         <Btn onClick={onCerrar} color={TEXT_SUB} outline small>Cerrar</Btn>
       </div>
     </Modal>
@@ -178,7 +182,7 @@ function DetalleProyecto({ proyecto, tareas, garantia, nombreCliente, onVisita, 
 }
 
 // ── Módulo ─────────────────────────────────────────────────────────────────────
-export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, garantias, setGarantias, crearProyecto, onResolverInspeccion }) {
+export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, garantias, setGarantias, crearProyecto, onCancelarProyecto, onResolverInspeccion }) {
   const garantiaDe = id => garantias.find(g => g.proyectoId === id);
   const [vista, setVista] = useState("proyectos");
   const [modal, setModal] = useState(null);          // "proyecto" | "Visita comercial" | "Incidencia del cliente"
@@ -199,8 +203,8 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
   const proximos = mants.filter(t => !esPasado(t.fecha) && t.fecha <= sumarDias(hoy(), 60));
   const masAdelante = mants.filter(t => t.fecha > sumarDias(hoy(), 60));
 
-  const abiertos = proyectos.filter(p => p.estado !== "Cerrado");
-  const cerrados = proyectos.filter(p => p.estado === "Cerrado");
+  const abiertos = proyectos.filter(p => p.estado !== "Cerrado" && p.estado !== "Cancelado");
+  const cerrados = proyectos.filter(p => p.estado === "Cerrado" || p.estado === "Cancelado");
 
   const guardarInspeccion = f => {
     setTareas(p => [...p, registrar(f, `Inspección creada (${ETIQUETA_ORIGEN[f.origen]})`, "Oficina")]);
@@ -247,12 +251,13 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
     </Card>
   );
 
+  const colorProyecto = p => p.estado === "Cerrado" ? GREEN : p.estado === "Cancelado" ? TEXT_SUB : ac;
   const tarjetaProyecto = p => {
     const suyas = tareas.filter(t => t.proyectoId === p.id);
     const pendientes = suyas.filter(estaAbierta).length;
     const proximo = suyas.filter(t => t.tipo === "Mantenimiento" && estaAbierta(t)).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
     return (
-      <Card key={p.id} onClick={() => setDetalle(p.id)} style={{ cursor: "pointer", borderLeft: `4px solid ${p.estado === "Cerrado" ? GREEN : ac}`, padding: 14 }}>
+      <Card key={p.id} onClick={() => setDetalle(p.id)} style={{ cursor: "pointer", borderLeft: `4px solid ${colorProyecto(p)}`, padding: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
           <div style={{ minWidth: 0 }}>
             <p style={{ margin: "0 0 3px", fontWeight: 700 }}>🏗️ {p.nombre}</p>
@@ -265,7 +270,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
               {garantiaDe(p.id) ? `🛡️ Garantía hasta el ${fechaCorta(garantiaDe(p.id).vence)}` : "🛡️ Garantía sin activar"}
             </p>
           </div>
-          <Badge text={p.estado} color={p.estado === "Cerrado" ? GREEN : ac} small />
+          <Badge text={p.estado} color={colorProyecto(p)} small />
         </div>
       </Card>
     );
@@ -293,7 +298,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
         <div style={{ height: 14 }} />
         {proyectos.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>Todavía no hay proyectos. Nacen al aprobar una cotización, al resolver una inspección o creándolos aquí.</p>}
         {seccion("En marcha", abiertos, tarjetaProyecto, ac)}
-        {seccion("Cerrados", [...cerrados].sort((a, b) => (b.fechaCierre || "").localeCompare(a.fechaCierre || "")), tarjetaProyecto)}
+        {seccion("Cerrados y cancelados", [...cerrados].sort((a, b) => (b.fechaCierre || "").localeCompare(a.fechaCierre || "")), tarjetaProyecto)}
       </>}
 
       {vista === "inspecciones" && <>
@@ -341,6 +346,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
           onVisita={(tipo, fecha) => setTareas(p => [...p, registrar(tareaDeProyecto(proyectoAbierto, { tipo, fecha }), `${tipo} añadida al proyecto`, "Oficina")])}
           onCerrarProyecto={() => actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, estado: "Cerrado", fechaCierre: hoy() }, "Cerrado a mano", "Oficina"))}
           onReabrir={() => actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, estado: "Abierto", fechaCierre: null, autoCierre: false }, "Reabierto", "Oficina"))}
+          onCancelarProyecto={() => { onCancelarProyecto(proyectoAbierto); setDetalle(null); }}
           garantia={garantiaDe(proyectoAbierto.id)}
           onActivarGarantia={({ fecha, serial }) => {
             const g = garantiaDeProyecto(proyectoAbierto, { fecha, serial });

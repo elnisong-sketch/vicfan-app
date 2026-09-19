@@ -9,6 +9,7 @@ import { prepararImagen, prepararLogo } from "./imagenes.js";
 import ModuloTareas, { registrar } from "./modules/Tareas.jsx";
 import ModuloOperaciones from "./modules/Operaciones.jsx";
 import { proyectoVacio, tareaDeProyecto, planAutomatico, diasHasta } from "./proyectos.js";
+import { materialDeItems, equipoComoMaterial, moverStock, avisoFaltantes } from "./inventario.js";
 import ModuloCotizaciones, { EMPRESA_POR_DEFECTO } from "./modules/Cotizaciones.jsx";
 import PantallaLogin from "./sesion.jsx";
 import { useSesion, salir as cerrarSesion } from "./auth.js";
@@ -114,7 +115,15 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }
   const ac = ACENTOS.inventario;
   const lista = sub === "modelos" ? inventario : repuestos;
   const setLista = sub === "modelos" ? setInventario : setRepuestos;
-  const guardar = () => { if (!form.nombre?.trim()) return; setLista(p => p.find(x => x.id === form.id) ? p.map(x => x.id === form.id ? form : x) : [...p, form]); setModal(false); };
+  const guardar = () => {
+    if (!form.nombre?.trim()) return;
+    // El precio y el stock se escriben libres (se puede borrar y reescribir) y
+    // solo al guardar se convierten a número. Antes se convertían en cada tecla
+    // y por eso no se podía borrar el último dígito.
+    const limpio = { ...form, precio: Number(form.precio) || 0, stock: Number(form.stock) || 0 };
+    setLista(p => p.find(x => x.id === limpio.id) ? p.map(x => x.id === limpio.id ? limpio : x) : [...p, limpio]);
+    setModal(false);
+  };
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -158,8 +167,8 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }
             <Inp label="Potencia" value={form.potencia || ""} onChange={v => setForm(f => ({ ...f, potencia: v }))} placeholder="5500W" />
             <Sel label="Combustible" value={form.combustible || "Gasolina"} onChange={v => setForm(f => ({ ...f, combustible: v }))} options={["Gasolina", "Gas/Propano", "Diésel", "Dual"].map(t => ({ value: t, label: t }))} />
           </>}
-          <Inp label="Precio ($)" value={String(form.precio || 0)} onChange={v => setForm(f => ({ ...f, precio: Number(v) }))} type="number" />
-          <Inp label="Stock" value={String(form.stock || 0)} onChange={v => setForm(f => ({ ...f, stock: Number(v) }))} type="number" />
+          <Inp label="Precio ($)" value={form.precio ?? ""} onChange={v => setForm(f => ({ ...f, precio: v }))} type="number" />
+          <Inp label="Stock" value={form.stock ?? ""} onChange={v => setForm(f => ({ ...f, stock: v }))} type="number" />
           <div style={{ display: "flex", gap: 10 }}><Btn onClick={guardar} color={ac} full>Guardar</Btn><Btn onClick={() => setModal(false)} color={TEXT_SUB} outline full>Cancelar</Btn></div>
         </Modal>
       )}
@@ -417,7 +426,18 @@ export default function App() {
   // común de las tres formas de empezar un trabajo: una cotización aprobada,
   // una inspección que se concretó o un proyecto creado directamente.
   const crearProyecto = (datos, tarea = {}) => {
-    const proyecto = registrar(proyectoVacio(datos), `Creado (${datos.origen || "Directo"})`, "Oficina");
+    // El material sale del inventario en cuanto se aprueba el trabajo. De una
+    // cotización viene su lista de líneas; de un proyecto directo, su equipo si
+    // coincide con una planta del catálogo.
+    const consumo = datos.consumo || equipoComoMaterial(datos.equipo, inventario);
+    const { consumo: _c, ...limpio } = datos;
+    const proyecto = registrar(proyectoVacio({ ...limpio, consumoStock: consumo }), `Creado (${datos.origen || "Directo"})`, "Oficina");
+    if (consumo.length) {
+      const r = moverStock(inventario, repuestos, consumo, -1);
+      setInventario(r.inventario);
+      setRepuestos(r.repuestos);
+      if (r.faltantes.length) setTimeout(() => alert(avisoFaltantes(r.faltantes)), 50);
+    }
     setProyectos(p => [...p, proyecto]);
     setTareas(p => [...p, registrar(tareaDeProyecto(proyecto, {
       tipo: "Instalación",
@@ -442,8 +462,27 @@ export default function App() {
       origen: `Cotización Nº ${q.numero}`,
       cotizacionId: q.id,
       inspeccionId: q.inspeccionId || null,
+      consumo: materialDeItems(q.items),
     }, { duracionDias: 2, cotizacionId: q.id, costo: alcance.costo });
     setTab("tareas");
+  };
+
+  // Cancelar un proyecto le devuelve al inventario el material que había
+  // salido y da por cerradas sus tareas pendientes. Es la vuelta atrás de una
+  // venta que al final no fue.
+  const cancelarProyecto = proyecto => {
+    if (!confirm(`¿Cancelar el proyecto «${proyecto.nombre}»?\n\nEl material descontado volverá al inventario y sus visitas pendientes se cancelarán.`)) return;
+    if (proyecto.consumoStock?.length) {
+      const r = moverStock(inventario, repuestos, proyecto.consumoStock, +1);
+      setInventario(r.inventario);
+      setRepuestos(r.repuestos);
+    }
+    setProyectos(p => p.map(x => x.id === proyecto.id
+      ? registrar({ ...x, estado: "Cancelado", autoCierre: false, consumoStock: [] }, "Proyecto cancelado · material devuelto al inventario", "Oficina")
+      : x));
+    setTareas(p => p.map(t => (t.proyectoId === proyecto.id && (t.estado === "Programada" || t.estado === "En proceso"))
+      ? registrar({ ...t, estado: "Cancelada" }, "Cancelada al cancelar el proyecto", "Oficina")
+      : t));
   };
 
   // Cerrar el círculo de una inspección ya realizada: o se convierte en
@@ -627,7 +666,7 @@ export default function App() {
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario}
                                      garantias={garantias} setGarantias={setGarantias}
-                                     crearProyecto={crearProyecto} onResolverInspeccion={resolverInspeccion} />}
+                                     crearProyecto={crearProyecto} onCancelarProyecto={cancelarProyecto} onResolverInspeccion={resolverInspeccion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}

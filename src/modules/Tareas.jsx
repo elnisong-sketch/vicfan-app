@@ -263,14 +263,14 @@ function ModalTarea({ form, setForm, clientes, onCrearCliente, onGuardar, onCerr
         <Inp label="Hora" type="time" value={form.hora} onChange={v => set("hora", v)} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <Inp label="Duración (días)" type="number" value={String(form.duracionDias ?? 1)} onChange={v => set("duracionDias", Math.max(1, Number(v) || 1))} />
+        <Inp label="Duración (días)" type="number" value={form.duracionDias ?? ""} onChange={v => set("duracionDias", v)} />
         <Sel label="Prioridad" value={form.prioridad} onChange={v => set("prioridad", v)} options={["Normal", "Alta", "Urgente"].map(p => ({ value: p, label: p }))} />
       </div>
 
       <Inp label="Equipo / modelo" value={form.modelo} onChange={v => set("modelo", v)} placeholder="GENERAC GP5500" />
       <Inp label="Dirección" value={form.direccion} onChange={v => set("direccion", v)} placeholder={cliente?.direccion || "Dirección de la visita"} />
       <Area label="Qué hay que hacer" value={form.descripcion} onChange={v => set("descripcion", v)} placeholder="Instrucciones para el técnico…" />
-      <Inp label="Costo estimado ($)" type="number" value={String(form.costo)} onChange={v => set("costo", Number(v))} />
+      <Inp label="Costo estimado ($)" type="number" value={form.costo ?? ""} onChange={v => set("costo", v)} />
 
       <div style={{ display: "flex", gap: 10 }}>
         <Btn onClick={onGuardar} color={ac} full disabled={!form.clienteId}>Guardar</Btn>
@@ -726,10 +726,11 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
 
   const guardar = () => {
     if (!form.clienteId) return;
+    const limpio = { ...form, duracionDias: Math.max(1, Number(form.duracionDias) || 1), costo: Number(form.costo) || 0 };
     setTareas(p => {
-      const existe = p.find(x => x.id === form.id);
-      if (existe) return p.map(x => x.id === form.id ? form : x);
-      return [...p, registrar(form, "Creada", quienActua)];
+      const existe = p.find(x => x.id === limpio.id);
+      if (existe) return p.map(x => x.id === limpio.id ? limpio : x);
+      return [...p, registrar(limpio, "Creada", quienActua)];
     });
     setForm(null);
   };
