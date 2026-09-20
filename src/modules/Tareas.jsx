@@ -451,7 +451,7 @@ function Observaciones({ notas, onAgregar, onBorrador, onEditar, onBorrar, puede
                 <p style={{ margin: 0, fontSize: 11, color: TEXT_SUB, fontWeight: 700 }}>
                   {n.autor} · {horaLegible(n.cuando)}{n.editado && " · editado"}
                 </p>
-                {puedeEditar && (
+                {puedeEditar && n.deOficina && (
                   <div style={{ display: "flex", gap: 4 }}>
                     <button onClick={() => setEditando({ id: n.id, texto: n.texto })} title="Editar"
                       style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: 2 }}>✏️</button>
@@ -748,7 +748,7 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
   // visita se pueda leer en orden sin ir saltando entre secciones.
   const agregarObservacion = (t, texto) => actualizar(t.id, x => registrar({
     ...x,
-    observaciones: [...(x.observaciones || []), { id: uid(), texto, autor: quienActua, cuando: new Date().toISOString() }],
+    observaciones: [...(x.observaciones || []), { id: uid(), texto, autor: quienActua, deOficina: !esTecnico, cuando: new Date().toISOString() }],
   }, "Comentario añadido", quienActua));
 
   // Corregir o quitar un comentario es cosa de oficina; queda anotado en el
