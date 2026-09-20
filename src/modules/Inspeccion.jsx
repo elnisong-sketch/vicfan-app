@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ACENTOS, TEXT_SUB, RED, Btn, Inp, Area, Sel, Modal, Chips, Etiqueta, estiloInput } from "../ui.jsx";
+import { ACENTOS, TEXT_SUB, RED, BORDER, BG_CARD, PRIORIDAD_COLOR, Btn, Inp, Area, Sel, Modal, Chips, Etiqueta, estiloInput } from "../ui.jsx";
 import { tareaVacia, ETIQUETA_ORIGEN } from "./Tareas.jsx";
 import { NuevoCliente } from "./Cotizaciones.jsx";
 
@@ -76,7 +76,19 @@ export function ModalInspeccion({ origen = "Visita comercial", clientes, onCrear
       <Inp label={falla ? "Equipo con la falla" : "Equipo (si ya se sabe)"} value={f.modelo} onChange={v => set("modelo", v)} placeholder="Generac 22kW…" />
       <Area label={falla ? "¿Qué falla reporta el cliente?" : "Motivo de la visita"} value={f.descripcion} onChange={v => set("descripcion", v)}
         placeholder={falla ? "No arranca, hace ruido, se apaga sola, código de error…" : "Evaluar dónde instalar, qué potencia necesita…"} />
-      <Sel label="Prioridad" value={f.prioridad} onChange={v => set("prioridad", v)} options={["Normal", "Alta", "Urgente"].map(p => ({ value: p, label: p }))} />
+      <Etiqueta>Prioridad</Etiqueta>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        {["Normal", "Alta", "Urgente"].map(p => {
+          const activo = (f.prioridad || "Normal") === p;
+          const col = PRIORIDAD_COLOR[p] || color;
+          return (
+            <button key={p} type="button" onClick={() => set("prioridad", p)}
+              style={{ flex: 1, padding: "11px 4px", borderRadius: 10, border: `2px solid ${activo ? col : BORDER}`, background: activo ? col + "22" : BG_CARD, color: activo ? col : TEXT_SUB, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+              {p}
+            </button>
+          );
+        })}
+      </div>
 
       {esTecnico ? (
         <p style={{ fontSize: 12, color: TEXT_SUB, lineHeight: 1.6, margin: "0 0 16px" }}>

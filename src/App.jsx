@@ -183,10 +183,10 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }
           <h3 style={{ margin: "0 0 20px", color: ac }}>{sub === "modelos" ? "Planta / Modelo" : "Repuesto"}</h3>
           <Inp label="Código" value={form.codigo || ""} onChange={v => setForm(f => ({ ...f, codigo: v }))} />
           <Inp label="Nombre" value={form.nombre || ""} onChange={v => setForm(f => ({ ...f, nombre: v }))} />
+          <CampoImagen label={sub === "modelos" ? "Foto del equipo" : "Foto del repuesto"} valor={form.imagen} preparar={prepararImagen}
+            onCambio={v => setForm(f => ({ ...f, imagen: v }))}
+            ayuda={sub === "modelos" ? "Aparece junto a esta planta en los presupuestos impresos." : "Se muestra junto al repuesto en el inventario."} />
           {sub === "modelos" && <>
-            <CampoImagen label="Foto del equipo" valor={form.imagen} preparar={prepararImagen}
-              onCambio={v => setForm(f => ({ ...f, imagen: v }))}
-              ayuda="Aparece junto a esta planta en los presupuestos impresos." />
             <Inp label="Potencia" value={form.potencia || ""} onChange={v => setForm(f => ({ ...f, potencia: v }))} placeholder="5500W" />
             <Sel label="Combustible" value={form.combustible || "Gasolina"} onChange={v => setForm(f => ({ ...f, combustible: v }))} options={["Gasolina", "Gas/Propano", "Diésel", "Dual"].map(t => ({ value: t, label: t }))} />
           </>}

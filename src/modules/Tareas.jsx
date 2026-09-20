@@ -262,9 +262,19 @@ function ModalTarea({ form, setForm, clientes, onCrearCliente, onGuardar, onCerr
         <Inp label="Fecha" type="date" value={form.fecha} onChange={v => set("fecha", v)} />
         <Inp label="Hora" type="time" value={form.hora} onChange={v => set("hora", v)} />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <Inp label="Duración (días)" type="number" value={form.duracionDias ?? ""} onChange={v => set("duracionDias", v)} />
-        <Sel label="Prioridad" value={form.prioridad} onChange={v => set("prioridad", v)} options={["Normal", "Alta", "Urgente"].map(p => ({ value: p, label: p }))} />
+      <Inp label="Duración (días)" type="number" value={form.duracionDias ?? ""} onChange={v => set("duracionDias", v)} />
+      <Etiqueta>Prioridad</Etiqueta>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        {["Normal", "Alta", "Urgente"].map(p => {
+          const activo = (form.prioridad || "Normal") === p;
+          const col = PRIORIDAD_COLOR[p] || ac;
+          return (
+            <button key={p} type="button" onClick={() => set("prioridad", p)}
+              style={{ flex: 1, padding: "11px 4px", borderRadius: 10, border: `2px solid ${activo ? col : BORDER}`, background: activo ? col + "22" : BG_CARD, color: activo ? col : TEXT_SUB, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+              {p}
+            </button>
+          );
+        })}
       </div>
 
       <Inp label="Equipo / modelo" value={form.modelo} onChange={v => set("modelo", v)} placeholder="GENERAC GP5500" />
