@@ -112,9 +112,17 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }
   const [sub, setSub] = useState("modelos");
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({});
+  const [busqueda, setBusqueda] = useState("");
   const ac = ACENTOS.inventario;
   const lista = sub === "modelos" ? inventario : repuestos;
   const setLista = sub === "modelos" ? setInventario : setRepuestos;
+  // Búsqueda sin distinguir mayúsculas ni acentos, por nombre o código, y todo
+  // en orden alfabético para encontrarlo rápido cuando la lista crece.
+  const norm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const q = norm(busqueda);
+  const visibles = lista
+    .filter(it => !q || norm(it.nombre).includes(q) || norm(it.codigo).includes(q) || norm(it.potencia).includes(q))
+    .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" }));
   const guardar = () => {
     if (!form.nombre?.trim()) return;
     // El precio y el stock se escriben libres (se puede borrar y reescribir) y
@@ -135,7 +143,22 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }
           <button key={t.id} onClick={() => setSub(t.id)} style={{ padding: "11px", borderRadius: 12, border: `2px solid ${sub === t.id ? ac : BORDER}`, background: sub === t.id ? ac + "22" : BG_CARD, color: sub === t.id ? ac : TEXT_SUB, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{t.label}</button>
         ))}
       </div>
-      {lista.map(item => (
+
+      <div style={{ position: "relative", marginBottom: 14 }}>
+        <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por nombre o código…"
+          style={{ width: "100%", boxSizing: "border-box", padding: "11px 36px 11px 12px", borderRadius: 12, border: `1px solid ${BORDER}`, background: BG_CARD, color: TEXT_MAIN, fontSize: 14, fontFamily: "inherit" }} />
+        {busqueda
+          ? <button onClick={() => setBusqueda("")} aria-label="Limpiar" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: TEXT_SUB, fontSize: 15, cursor: "pointer", padding: 4 }}>✕</button>
+          : <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: TEXT_SUB, fontSize: 14, pointerEvents: "none" }}>🔍</span>}
+      </div>
+      {busqueda && <p style={{ margin: "-6px 2px 12px", fontSize: 12, color: TEXT_SUB }}>{visibles.length} resultado{visibles.length === 1 ? "" : "s"}</p>}
+
+      {visibles.length === 0 && (
+        <p style={{ color: TEXT_SUB, textAlign: "center", padding: "24px 0", fontSize: 14 }}>
+          {busqueda ? "Nada coincide con la búsqueda." : sub === "modelos" ? "Sin plantas todavía." : "Sin repuestos todavía."}
+        </p>
+      )}
+      {visibles.map(item => (
         <Card key={item.id}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
             {item.imagen && <img src={item.imagen} alt="" style={{ width: 56, height: 56, objectFit: "contain", borderRadius: 8, border: `1px solid ${BORDER}` }} />}
