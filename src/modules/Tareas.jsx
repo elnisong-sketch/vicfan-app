@@ -418,8 +418,9 @@ function GuardarEnLinea({ fotos }) {
 // Se acumulan en vez de sobrescribirse: cada nota queda firmada y fechada, de
 // modo que la oficina puede leer lo que el técnico fue anotando durante el
 // trabajo sin que una nota tape a la anterior.
-function Observaciones({ notas, onAgregar, onBorrador, quien }) {
+function Observaciones({ notas, onAgregar, onBorrador, onEditar, onBorrar, puedeEditar, quien }) {
   const [texto, setTexto] = useState("");
+  const [editando, setEditando] = useState(null);   // { id, texto } de la nota en edición
   const escribir = v => { setTexto(v); onBorrador?.(v); };
   const agregar = () => { if (!texto.trim()) return; onAgregar(texto.trim()); escribir(""); };
   const pendiente = texto.trim().length > 0;
@@ -434,8 +435,33 @@ function Observaciones({ notas, onAgregar, onBorrador, quien }) {
 
       {notas.map(n => (
         <div key={n.id} style={{ background: BG_INPUT, borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
-          <p style={{ margin: "0 0 4px", fontSize: 14 }}>{n.texto}</p>
-          <p style={{ margin: 0, fontSize: 11, color: TEXT_SUB, fontWeight: 700 }}>{n.autor} · {horaLegible(n.cuando)}</p>
+          {editando?.id === n.id ? (
+            <>
+              <textarea value={editando.texto} onChange={e => setEditando(x => ({ ...x, texto: e.target.value }))} rows={2}
+                style={{ ...estiloInput, resize: "vertical", marginBottom: 6 }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn onClick={() => { const t = editando.texto.trim(); if (t) onEditar(n.id, t); setEditando(null); }} color={ac} small disabled={!editando.texto.trim()}>Guardar</Btn>
+                <Btn onClick={() => setEditando(null)} color={TEXT_SUB} outline small>Cancelar</Btn>
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={{ margin: "0 0 4px", fontSize: 14, whiteSpace: "pre-line" }}>{n.texto}</p>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <p style={{ margin: 0, fontSize: 11, color: TEXT_SUB, fontWeight: 700 }}>
+                  {n.autor} · {horaLegible(n.cuando)}{n.editado && " · editado"}
+                </p>
+                {puedeEditar && (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button onClick={() => setEditando({ id: n.id, texto: n.texto })} title="Editar"
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: 2 }}>✏️</button>
+                    <button onClick={() => { if (confirm("¿Borrar este comentario?")) onBorrar(n.id); }} title="Borrar"
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: 2 }}>🗑️</button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       ))}
 
@@ -459,7 +485,7 @@ function Observaciones({ notas, onAgregar, onBorrador, quien }) {
 }
 
 // ── MODAL: DETALLE / HISTORIAL ────────────────────────────────────────────────
-function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, onCancelarTarea, onFotos, onObservacion, onReabrir, onPublicar, onResolver, onCerrar }) {
+function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, onCancelarTarea, onFotos, onObservacion, onEditarObservacion, onBorrarObservacion, onReabrir, onPublicar, onResolver, onCerrar }) {
   const [nuevaFecha, setNuevaFecha] = useState(tarea.fecha);
   const [reprogramando, setReprogramando] = useState(false);
   const [confirmarReapertura, setConfirmarReapertura] = useState(false);
@@ -555,6 +581,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
         soloLectura={tarea.estado === "Cancelada" || (esTecnico && !estaAbierta(tarea))} />
 
       <Observaciones notas={tarea.observaciones || []} onAgregar={onObservacion}
+        onEditar={onEditarObservacion} onBorrar={onBorrarObservacion} puedeEditar={!esTecnico}
         onBorrador={v => { borrador.current = v; }} quien={sesion?.nombre || "Oficina"} />
 
       <GuardarEnLinea fotos={tarea.fotos || []} />
@@ -724,6 +751,19 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
     observaciones: [...(x.observaciones || []), { id: uid(), texto, autor: quienActua, cuando: new Date().toISOString() }],
   }, "Comentario añadido", quienActua));
 
+  // Corregir o quitar un comentario es cosa de oficina; queda anotado en el
+  // historial para que se note que se tocó.
+  const editarObservacion = (t, id, texto) => actualizar(t.id, x => registrar({
+    ...x,
+    observaciones: (x.observaciones || []).map(o => o.id === id
+      ? { ...o, texto, editado: true, editadoEn: new Date().toISOString(), editadoPor: quienActua } : o),
+  }, "Comentario editado", quienActua));
+
+  const borrarObservacion = (t, id) => actualizar(t.id, x => registrar({
+    ...x,
+    observaciones: (x.observaciones || []).filter(o => o.id !== id),
+  }, "Comentario borrado", quienActua));
+
   // Reabrir no borra el cierre anterior: lo archiva. Si una instalación hubo
   // que rehacerla, tiene que quedar constancia de que se cerró una primera vez
   // y de quién la cerró.
@@ -851,6 +891,8 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
           onFotos={(fotos, info) => actualizar(detalle.id, x =>
             info?.accion ? registrar({ ...x, fotos }, info.accion, quienActua) : { ...x, fotos })}
           onObservacion={texto => agregarObservacion(detalle, texto)}
+          onEditarObservacion={(id, texto) => editarObservacion(detalle, id, texto)}
+          onBorrarObservacion={id => borrarObservacion(detalle, id)}
           onReabrir={() => reabrir(detalle)}
           onPublicar={valor => publicar(detalle, valor)}
           onResolver={onResolverInspeccion ? r => { onResolverInspeccion(tareas.find(t => t.id === detalle.id) || detalle, r); setDetalle(null); } : null}
