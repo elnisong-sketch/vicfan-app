@@ -20,6 +20,35 @@ import { resumenMaterial } from "../inventario.js";
 const ac = ACENTOS.operaciones;
 const ICONO = { "Instalación": "🔧", "Mantenimiento": "🔩", "Reparación": "🛠️", "Garantía": "🛡️", "Inspección": "🔍" };
 
+// Buscador visible para el equipo: se escribe y sugiere plantas del inventario;
+// también admite texto libre para un equipo que no esté en el catálogo.
+function SelectorEquipo({ valor, inventario, onEscribir, onElegir }) {
+  const [abierto, setAbierto] = useState(false);
+  const norm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const q = norm(valor);
+  const sug = inventario.filter(m => q && norm(`${m.nombre} ${m.codigo || ""} ${m.potencia || ""}`).includes(q) && m.nombre !== valor).slice(0, 8);
+  return (
+    <div style={{ position: "relative", marginBottom: 8 }}>
+      <Etiqueta>Equipo</Etiqueta>
+      <input value={valor || ""} onFocus={() => setAbierto(true)} onChange={e => { onEscribir(e.target.value); setAbierto(true); }}
+        placeholder="🔍 Escribe o elige una planta…" style={estiloInput} />
+      {abierto && sug.length > 0 && (
+        <>
+          <div onClick={() => setAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
+          <div style={{ position: "absolute", zIndex: 30, left: 0, right: 0, top: "100%", marginTop: 4, background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 12, maxHeight: 240, overflowY: "auto", boxShadow: "0 8px 24px #00000022" }}>
+            {sug.map(m => (
+              <button key={m.id} type="button" onMouseDown={e => e.preventDefault()} onClick={() => { onElegir(m.nombre); setAbierto(false); }}
+                style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: `1px solid ${BORDER}`, padding: "10px 12px", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit" }}>
+                ⚡ {m.nombre}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Alta de proyecto sin pasar por cotización ──────────────────────────────────
 function ModalProyecto({ clientes, onCrearCliente, inventario, onGuardar, onCerrar }) {
   const [f, setF] = useState({ ...proyectoVacio(), duracionDias: 2, hora: "09:00" });
@@ -33,12 +62,7 @@ function ModalProyecto({ clientes, onCrearCliente, inventario, onGuardar, onCerr
       <h3 style={{ margin: "0 0 16px", color: ac }}>🏗️ Nuevo proyecto</h3>
       <SelectorCliente clientes={clientes} valor={f.clienteId} onCambio={elegirCliente} onCrear={onCrearCliente} />
 
-      <Etiqueta>Equipo</Etiqueta>
-      <select value={inventario.some(m => m.nombre === f.equipo) ? f.equipo : ""} onChange={e => elegirEquipo(e.target.value)} style={{ ...estiloInput, marginBottom: 8 }}>
-        <option value="">— Del inventario, o escríbelo abajo —</option>
-        {inventario.map(m => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
-      </select>
-      <Inp value={f.equipo} onChange={v => set("equipo", v)} placeholder="Generac 26kW…" />
+      <SelectorEquipo valor={f.equipo} inventario={inventario} onEscribir={v => set("equipo", v)} onElegir={elegirEquipo} />
 
       <Inp label="Nombre del proyecto" value={f.nombre} onChange={v => set("nombre", v)} placeholder="Instalación Generac 26kW" />
       <Inp label="Dirección" value={f.direccion} onChange={v => set("direccion", v)} />

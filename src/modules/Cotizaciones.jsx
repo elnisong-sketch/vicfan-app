@@ -169,6 +169,49 @@ export function NuevoCliente({ onCrear, onCancelar }) {
 }
 
 // ── LÍNEAS DEL PRESUPUESTO ────────────────────────────────────────────────────
+// Buscador visible para añadir una línea: se escribe y va filtrando plantas,
+// repuestos y servicios. Sustituye al desplegable nativo, que en el móvil no
+// sacaba teclado y en el ordenador buscaba a ciegas.
+function AgregarLinea({ inventario, repuestos, onAgregar }) {
+  const [texto, setTexto] = useState("");
+  const [abierto, setAbierto] = useState(false);
+  const norm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const q = norm(texto);
+  const opciones = [
+    ...inventario.map((m, i) => ({ k: `planta:${i}`, icono: "⚡", label: m.nombre, extra: usd(m.precio), buscar: norm(`${m.nombre} ${m.codigo || ""} ${m.potencia || ""}`) })),
+    ...repuestos.map((r, i) => ({ k: `repuesto:${i}`, icono: "🔩", label: r.nombre, extra: usd(r.precio), buscar: norm(`${r.nombre} ${r.codigo || ""}`) })),
+    ...SERVICIOS_CATALOGO.map((sv, i) => ({ k: `servicio:${i}`, icono: "🔧", label: sv.nombre, extra: "Servicio", buscar: norm(sv.nombre) })),
+  ];
+  const filtradas = (q ? opciones.filter(o => o.buscar.includes(q)) : opciones).slice(0, 20);
+  const elegir = k => { onAgregar(k); setTexto(""); setAbierto(false); };
+
+  return (
+    <div style={{ position: "relative", marginBottom: 12 }}>
+      <input value={texto} onFocus={() => setAbierto(true)} onChange={e => { setTexto(e.target.value); setAbierto(true); }}
+        placeholder="🔍 Escribe para buscar planta, repuesto o servicio…" style={{ ...estiloInput }} />
+      {abierto && (
+        <>
+          <div onClick={() => setAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
+          <div style={{ position: "absolute", zIndex: 30, left: 0, right: 0, top: "100%", marginTop: 4, background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 12, maxHeight: 260, overflowY: "auto", boxShadow: "0 8px 24px #00000022" }}>
+            {filtradas.length === 0 && <p style={{ margin: 0, padding: 12, fontSize: 13, color: TEXT_SUB }}>Nada coincide.</p>}
+            {filtradas.map(o => (
+              <button key={o.k} type="button" onMouseDown={e => e.preventDefault()} onClick={() => elegir(o.k)}
+                style={{ display: "flex", justifyContent: "space-between", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: `1px solid ${BORDER}`, padding: "10px 12px", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit" }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.icono} {o.label}</span>
+                <span style={{ color: TEXT_SUB, whiteSpace: "nowrap" }}>{o.extra}</span>
+              </button>
+            ))}
+            <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => elegir("libre")}
+              style={{ width: "100%", textAlign: "left", background: BG_INPUT, border: "none", padding: "10px 12px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: ac, fontFamily: "inherit" }}>
+              ✏️ Escribir una línea a mano
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function LineasItems({ items, onCambio, inventario, repuestos }) {
   const [aAgregar, setAAgregar] = useState("");
 
@@ -204,21 +247,7 @@ export function LineasItems({ items, onCambio, inventario, repuestos }) {
     <div style={{ marginBottom: 14 }}>
       <Etiqueta>Descripción · cantidad · precio unitario</Etiqueta>
 
-      <select value={aAgregar} onChange={e => agregar(e.target.value)} style={{ ...estiloInput, marginBottom: 12 }}>
-        <option value="">➕ Agregar línea…</option>
-        <optgroup label="⚡ Plantas y equipos">
-          {inventario.map((m, i) => <option key={m.id} value={`planta:${i}`}>{m.nombre} — {usd(m.precio)}</option>)}
-        </optgroup>
-        <optgroup label="🔩 Repuestos">
-          {repuestos.map((r, i) => <option key={r.id} value={`repuesto:${i}`}>{r.nombre} — {usd(r.precio)}</option>)}
-        </optgroup>
-        <optgroup label="🔧 Servicios">
-          {SERVICIOS_CATALOGO.map((s, i) => <option key={s.nombre} value={`servicio:${i}`}>{s.nombre}</option>)}
-        </optgroup>
-        <optgroup label="✏️ Manual">
-          <option value="libre">Escribir una línea a mano</option>
-        </optgroup>
-      </select>
+      <AgregarLinea inventario={inventario} repuestos={repuestos} onAgregar={agregar} />
 
       {items.map(it => (
         <div key={it.id} style={{ background: BG_INPUT, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 12, marginBottom: 8 }}>
