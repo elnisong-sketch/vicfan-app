@@ -182,7 +182,7 @@ function AgregarLinea({ inventario, repuestos, onAgregar }) {
     ...repuestos.map((r, i) => ({ k: `repuesto:${i}`, icono: "🔩", label: r.nombre, extra: usd(r.precio), buscar: norm(`${r.nombre} ${r.codigo || ""}`) })),
     ...SERVICIOS_CATALOGO.map((sv, i) => ({ k: `servicio:${i}`, icono: "🔧", label: sv.nombre, extra: "Servicio", buscar: norm(sv.nombre) })),
   ];
-  const filtradas = (q ? opciones.filter(o => o.buscar.includes(q)) : opciones).slice(0, 20);
+  const filtradas = q ? opciones.filter(o => o.buscar.includes(q)) : opciones;
   const elegir = k => { onAgregar(k); setTexto(""); setAbierto(false); };
 
   return (

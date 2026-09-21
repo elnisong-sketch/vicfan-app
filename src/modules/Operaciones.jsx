@@ -26,7 +26,7 @@ function SelectorEquipo({ valor, inventario, onEscribir, onElegir }) {
   const [abierto, setAbierto] = useState(false);
   const norm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const q = norm(valor);
-  const sug = inventario.filter(m => q && norm(`${m.nombre} ${m.codigo || ""} ${m.potencia || ""}`).includes(q) && m.nombre !== valor).slice(0, 8);
+  const sug = inventario.filter(m => (!q || norm(`${m.nombre} ${m.codigo || ""} ${m.potencia || ""}`).includes(q)) && m.nombre !== valor);
   return (
     <div style={{ position: "relative", marginBottom: 8 }}>
       <Etiqueta>Equipo</Etiqueta>
