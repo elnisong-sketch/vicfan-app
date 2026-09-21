@@ -233,12 +233,31 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
 }
 
 // ── INVENTARIO ────────────────────────────────────────────────────────────────
-function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }) {
+function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, movimientos, setMovimientos }) {
   const [sub, setSub] = useState("modelos");
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({});
   const [busqueda, setBusqueda] = useState("");
+  const [entrada, setEntrada] = useState(null);        // { item, clase } al que se le añade stock
+  const [entCant, setEntCant] = useState("");
+  const [entCosto, setEntCosto] = useState("");
   const ac = ACENTOS.inventario;
+  const todos = [...inventario, ...repuestos];
+  const totalUnidades = todos.reduce((s, x) => s + (Number(x.stock) || 0), 0);
+  const valorTotal = todos.reduce((s, x) => s + (Number(x.stock) || 0) * (Number(x.precio) || 0), 0);
+  const agotados = todos.filter(x => (Number(x.stock) || 0) <= 0).length;
+
+  // Anotar una compra: sube el stock del artículo y deja el movimiento con su
+  // fecha y costo, para llevar el control de lo que se va comprando.
+  const registrarEntrada = () => {
+    const n = Number(entCant) || 0;
+    if (!entrada || n <= 0) return;
+    const setL = entrada.clase === "modelos" ? setInventario : setRepuestos;
+    setL(p => p.map(x => x.id === entrada.item.id ? { ...x, stock: (Number(x.stock) || 0) + n } : x));
+    const cu = Number(entCosto) || 0;
+    setMovimientos(p => [...p, { id: uid(), fecha: hoy(), tipo: "entrada", clase: entrada.clase === "modelos" ? "planta" : "repuesto", articuloId: entrada.item.id, articuloNombre: entrada.item.nombre, cantidad: n, costoUnit: cu, costoTotal: cu * n, origen: "Compra", creadoEn: new Date().toISOString() }]);
+    setEntrada(null);
+  };
   const lista = sub === "modelos" ? inventario : repuestos;
   const setLista = sub === "modelos" ? setInventario : setRepuestos;
   // Búsqueda sin distinguir mayúsculas ni acentos, por nombre o código, y todo
@@ -254,21 +273,34 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }
     // solo al guardar se convierten a número. Antes se convertían en cada tecla
     // y por eso no se podía borrar el último dígito.
     const limpio = { ...form, precio: Number(form.precio) || 0, stock: Number(form.stock) || 0 };
-    setLista(p => p.find(x => x.id === limpio.id) ? p.map(x => x.id === limpio.id ? limpio : x) : [...p, limpio]);
+    const esNuevo = !lista.find(x => x.id === limpio.id);
+    setLista(p => esNuevo ? [...p, limpio] : p.map(x => x.id === limpio.id ? limpio : x));
+    if (esNuevo && limpio.stock > 0) {
+      setMovimientos(p => [...p, { id: uid(), fecha: hoy(), tipo: "entrada", clase: sub === "modelos" ? "planta" : "repuesto", articuloId: limpio.id, articuloNombre: limpio.nombre, cantidad: limpio.stock, costoUnit: 0, costoTotal: 0, origen: "Carga inicial", creadoEn: new Date().toISOString() }]);
+    }
     setModal(false);
   };
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>📦 Inventario</h2>
-        <Btn onClick={() => { setForm(sub === "modelos" ? { id: uid(), codigo: "", nombre: "", potencia: "", combustible: "Gasolina", precio: 0, stock: 0 } : { id: uid(), codigo: "", nombre: "", precio: 0, stock: 0 }); setModal(true); }} color={ac} small>+ Nuevo</Btn>
+        {sub !== "historial" && <Btn onClick={() => { setForm(sub === "modelos" ? { id: uid(), codigo: "", nombre: "", potencia: "", combustible: "Gasolina", precio: 0, stock: 0 } : { id: uid(), codigo: "", nombre: "", precio: 0, stock: 0 }); setModal(true); }} color={ac} small>+ Nuevo</Btn>}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-        {[{ id: "modelos", label: "⚡ Plantas" }, { id: "repuestos", label: "🔩 Repuestos" }].map(t => (
-          <button key={t.id} onClick={() => setSub(t.id)} style={{ padding: "11px", borderRadius: 12, border: `2px solid ${sub === t.id ? ac : BORDER}`, background: sub === t.id ? ac + "22" : BG_CARD, color: sub === t.id ? ac : TEXT_SUB, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{t.label}</button>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+        {[["Unidades", totalUnidades, ac], ["Valor", usd(valorTotal), GREEN], ["Agotados", agotados, agotados ? RED : GREEN]].map(([t, v, col]) => (
+          <Card key={t} style={{ padding: "10px 12px" }}>
+            <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase" }}>{t}</p>
+            <p style={{ margin: "2px 0 0", fontSize: 17, fontWeight: 900, color: col }}>{v}</p>
+          </Card>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+        {[{ id: "modelos", label: "⚡ Plantas" }, { id: "repuestos", label: "🔩 Repuestos" }, { id: "historial", label: "📥 Historial" }].map(t => (
+          <button key={t.id} onClick={() => setSub(t.id)} style={{ padding: "11px 6px", borderRadius: 12, border: `2px solid ${sub === t.id ? ac : BORDER}`, background: sub === t.id ? ac + "22" : BG_CARD, color: sub === t.id ? ac : TEXT_SUB, fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>{t.label}</button>
         ))}
       </div>
 
+      {sub !== "historial" && <>
       <div style={{ position: "relative", marginBottom: 14 }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por nombre o código…"
           style={{ width: "100%", boxSizing: "border-box", padding: "11px 36px 11px 12px", borderRadius: 12, border: `1px solid ${BORDER}`, background: BG_CARD, color: TEXT_MAIN, fontSize: 14, fontFamily: "inherit" }} />
@@ -297,12 +329,52 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos }
               </div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
+              <Btn onClick={() => { setEntCant(""); setEntCosto(""); setEntrada({ item, clase: sub }); }} color={GREEN} outline small>📥</Btn>
               <Btn onClick={() => { setForm({ ...item }); setModal(true); }} color={ac} outline small>✏️</Btn>
               <Btn onClick={() => setLista(p => p.filter(x => x.id !== item.id))} color={RED} outline small>🗑️</Btn>
             </div>
           </div>
         </Card>
       ))}
+      </>}
+
+      {sub === "historial" && (
+        <>
+          {movimientos.length === 0 && (
+            <p style={{ color: TEXT_SUB, textAlign: "center", padding: "24px 0", fontSize: 14 }}>
+              Sin movimientos todavía. Se anotan al crear un artículo con stock o al registrar una entrada (📥) en un artículo.
+            </p>
+          )}
+          {[...movimientos].sort((a, b) => (b.creadoEn || "").localeCompare(a.creadoEn || "")).map(m => (
+            <Card key={m.id}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: "0 0 2px", fontWeight: 700, fontSize: 14 }}>{m.clase === "planta" ? "⚡" : "🔩"} {m.articuloNombre}</p>
+                  <p style={{ margin: 0, fontSize: 12.5, color: TEXT_SUB }}>📅 {m.fecha} · {m.origen}</p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: GREEN }}>+{m.cantidad}</p>
+                  {m.costoTotal > 0 && <p style={{ margin: "2px 0 0", fontSize: 12, color: TEXT_SUB }}>{usd(m.costoTotal)}</p>}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </>
+      )}
+
+      {entrada && (
+        <Modal onClose={() => setEntrada(null)}>
+          <h3 style={{ margin: "0 0 6px", color: ac }}>📥 Entrada de stock</h3>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}>{entrada.item.nombre} · stock actual: {entrada.item.stock ?? 0}</p>
+          <Inp label="¿Cuántas unidades entran?" type="number" value={entCant} onChange={setEntCant} placeholder="0" />
+          <Inp label="Costo por unidad ($) — opcional" type="number" value={entCosto} onChange={setEntCosto} placeholder="0" />
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={registrarEntrada} color={GREEN} full disabled={!(Number(entCant) > 0)}>Registrar entrada</Btn>
+            <Btn onClick={() => setEntrada(null)} color={TEXT_SUB} outline full>Cancelar</Btn>
+          </div>
+        </Modal>
+      )}
+
       {modal && (
         <Modal onClose={() => setModal(false)}>
           <h3 style={{ margin: "0 0 20px", color: ac }}>{sub === "modelos" ? "Planta / Modelo" : "Repuesto"}</h3>
@@ -546,6 +618,7 @@ export default function App() {
   const [inventario, setInventario]     = useColeccion("inventario", [], conectado);
   const [repuestos, setRepuestos]       = useColeccion("repuestos", [], conectado);
   const [garantias, setGarantias]       = useColeccion("garantias", [], conectado);
+  const [movimientos, setMovimientos]   = useColeccion("movimientos", [], esOficina);
   const [tecnicos, setTecnicos]         = useColeccion("tecnicos", [], conectado);
   // Membrete del presupuesto: una sola ficha, pero se sincroniza igual que el
   // resto para que ambos dispositivos emitan con los mismos datos.
@@ -776,13 +849,14 @@ export default function App() {
     if (Array.isArray(d.inventario))   setInventario(d.inventario);
     if (Array.isArray(d.repuestos))    setRepuestos(d.repuestos);
     if (Array.isArray(d.garantias))    setGarantias(d.garantias);
+    if (Array.isArray(d.movimientos))  setMovimientos(d.movimientos);
     if (Array.isArray(d.tecnicos))     setTecnicos(d.tecnicos);
     if (Array.isArray(d.proyectos))    setProyectos(d.proyectos);
     setTab("inicio");
   };
 
   const exportarDatos = () => {
-    const datos = { clientes, cotizaciones, ventas, tareas, proyectos, inventario, repuestos, garantias, tecnicos, exportado: new Date().toISOString() };
+    const datos = { clientes, cotizaciones, ventas, tareas, proyectos, inventario, repuestos, garantias, movimientos, tecnicos, exportado: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -891,7 +965,7 @@ export default function App() {
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEditarVenta={editarVenta} onEliminarVenta={eliminarVenta} />}
-        {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
+        {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} movimientos={movimientos} setMovimientos={setMovimientos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
         {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos}
           empresa={empresa} setEmpresa={d => setEmpresaLista([d])} correo={sesion.correo} />}
