@@ -6,7 +6,7 @@ import {
 } from "../ui.jsx";
 import { registrar, estaAbierta, esIncidencia, claseInspeccion, ETIQUETA_ORIGEN, RESULTADO_COLOR } from "./Tareas.jsx";
 import { SelectorCliente, ModalInspeccion } from "./Inspeccion.jsx";
-import { AgregarLinea } from "./Cotizaciones.jsx";
+import { AgregarLinea, LineasItems } from "./Cotizaciones.jsx";
 import { proyectoVacio, tareaDeProyecto, MESES_MANTENIMIENTO, MESES_GARANTIA, diasHasta, garantiaDeProyecto } from "../proyectos.js";
 import { resumenMaterial } from "../inventario.js";
 
@@ -51,8 +51,8 @@ function SelectorEquipo({ valor, inventario, onEscribir, onElegir }) {
 }
 
 // ── Alta de proyecto sin pasar por cotización ──────────────────────────────────
-function ModalProyecto({ clientes, onCrearCliente, inventario, onGuardar, onCerrar }) {
-  const [f, setF] = useState({ ...proyectoVacio(), duracionDias: 2, hora: "09:00" });
+function ModalProyecto({ clientes, onCrearCliente, inventario, repuestos, onGuardar, onCerrar }) {
+  const [f, setF] = useState({ ...proyectoVacio(), items: [], duracionDias: 2, hora: "09:00" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
 
   const elegirCliente = (id, c) => setF(p => ({ ...p, clienteId: id, direccion: p.direccion || c?.direccion || "" }));
@@ -63,12 +63,13 @@ function ModalProyecto({ clientes, onCrearCliente, inventario, onGuardar, onCerr
       <h3 style={{ margin: "0 0 16px", color: ac }}>🏗️ Nuevo proyecto</h3>
       <SelectorCliente clientes={clientes} valor={f.clienteId} onCambio={elegirCliente} onCrear={onCrearCliente} />
 
-      <SelectorEquipo valor={f.equipo} inventario={inventario} onEscribir={v => set("equipo", v)} onElegir={elegirEquipo} />
+      <Etiqueta>Materiales y equipos del proyecto</Etiqueta>
+      <LineasItems items={f.items || []} inventario={inventario} repuestos={repuestos}
+        onCambio={items => setF(p => { const planta = items.find(i => i.modeloId); return { ...p, items, equipo: planta ? planta.nombre : p.equipo, nombre: p.nombre || (planta ? `Instalación ${planta.nombre}` : "") }; })} />
 
       <Inp label="Nombre del proyecto" value={f.nombre} onChange={v => set("nombre", v)} placeholder="Instalación Generac 26kW" />
       <Inp label="Dirección" value={f.direccion} onChange={v => set("direccion", v)} />
       <Area label="Alcance del trabajo" value={f.descripcion} onChange={v => set("descripcion", v)} placeholder="Qué incluye, instrucciones para el técnico…" />
-      <Inp label="Precio de venta ($)" type="number" value={f.precioVenta ?? ""} onChange={v => set("precioVenta", v)} placeholder="0" />
 
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10 }}>
         <Inp label="Inicio de la instalación" type="date" value={f.fechaInicio} onChange={v => set("fechaInicio", v)} />
@@ -289,8 +290,8 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
   };
 
   const guardarProyecto = f => {
-    const { duracionDias, hora, ...datos } = f;
-    crearProyecto(datos, { duracionDias, hora, fecha: f.fechaInicio });
+    const { duracionDias, hora, items, ...datos } = f;
+    crearProyecto({ ...datos, ventaItems: items }, { duracionDias, hora, fecha: f.fechaInicio });
     setModal(null);
   };
 
@@ -426,7 +427,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       )}
 
       {modal === "proyecto" && (
-        <ModalProyecto clientes={clientes} onCrearCliente={crearCliente} inventario={inventario}
+        <ModalProyecto clientes={clientes} onCrearCliente={crearCliente} inventario={inventario} repuestos={repuestos}
           onGuardar={guardarProyecto} onCerrar={() => setModal(null)} />
       )}
       {(modal === "Visita comercial" || modal === "Incidencia del cliente") && (

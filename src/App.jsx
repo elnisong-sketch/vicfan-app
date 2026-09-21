@@ -752,10 +752,14 @@ export default function App() {
   // y descuenta el stock.
   const crearProyectoDirecto = (datos, tarea = {}) => {
     const proyecto = crearProyecto(datos, tarea);
-    const precio = Number(datos.precioVenta) || 0;
-    const planta = datos.equipo ? inventario.find(m => m.nombre === datos.equipo) : null;
-    const items = datos.equipo ? [{ id: uid(), modeloId: planta?.id, nombre: datos.equipo, cantidad: 1, precio, subtotal: precio }] : [];
-    registrarVenta({ clienteId: datos.clienteId, items, total: precio, origen: `Proyecto: ${proyecto.nombre}`, proyectoId: proyecto.id });
+    let items = datos.ventaItems && datos.ventaItems.length ? datos.ventaItems : [];
+    if (!items.length && datos.equipo) {
+      const precio = Number(datos.precioVenta) || 0;
+      const planta = inventario.find(m => m.nombre === datos.equipo);
+      items = [{ id: uid(), modeloId: planta?.id, nombre: datos.equipo, cantidad: 1, precio, subtotal: precio }];
+    }
+    const total = items.reduce((s, i) => s + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
+    registrarVenta({ clienteId: datos.clienteId, items, total, origen: `Proyecto: ${proyecto.nombre}`, proyectoId: proyecto.id });
     return proyecto;
   };
 
