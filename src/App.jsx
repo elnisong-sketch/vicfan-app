@@ -241,6 +241,7 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
   const [entrada, setEntrada] = useState(null);        // { item, clase } al que se le añade stock
   const [entCant, setEntCant] = useState("");
   const [entCosto, setEntCosto] = useState("");
+  const [histFiltro, setHistFiltro] = useState("todo");
   const ac = ACENTOS.inventario;
   const todos = [...inventario, ...repuestos];
   const totalUnidades = todos.reduce((s, x) => s + (Number(x.stock) || 0), 0);
@@ -273,10 +274,14 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
     // solo al guardar se convierten a número. Antes se convertían en cada tecla
     // y por eso no se podía borrar el último dígito.
     const limpio = { ...form, precio: Number(form.precio) || 0, stock: Number(form.stock) || 0 };
-    const esNuevo = !lista.find(x => x.id === limpio.id);
+    const viejo = lista.find(x => x.id === limpio.id);
+    const esNuevo = !viejo;
     setLista(p => esNuevo ? [...p, limpio] : p.map(x => x.id === limpio.id ? limpio : x));
     if (esNuevo && limpio.stock > 0) {
       setMovimientos(p => [...p, { id: uid(), fecha: hoy(), tipo: "entrada", clase: sub === "modelos" ? "planta" : "repuesto", articuloId: limpio.id, articuloNombre: limpio.nombre, cantidad: limpio.stock, costoUnit: 0, costoTotal: 0, origen: "Carga inicial", creadoEn: new Date().toISOString() }]);
+    } else if (viejo && (Number(viejo.stock) || 0) !== limpio.stock) {
+      const delta = limpio.stock - (Number(viejo.stock) || 0);
+      setMovimientos(p => [...p, { id: uid(), fecha: hoy(), tipo: delta > 0 ? "entrada" : "salida", clase: sub === "modelos" ? "planta" : "repuesto", articuloId: limpio.id, articuloNombre: limpio.nombre, cantidad: Math.abs(delta), costoUnit: 0, costoTotal: 0, origen: "Ajuste manual (edición)", creadoEn: new Date().toISOString() }]);
     }
     setModal(false);
   };
@@ -331,7 +336,7 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
             <div style={{ display: "flex", gap: 6 }}>
               <Btn onClick={() => { setEntCant(""); setEntCosto(""); setEntrada({ item, clase: sub }); }} color={GREEN} outline small>📥</Btn>
               <Btn onClick={() => { setForm({ ...item }); setModal(true); }} color={ac} outline small>✏️</Btn>
-              <Btn onClick={() => setLista(p => p.filter(x => x.id !== item.id))} color={RED} outline small>🗑️</Btn>
+              <Btn onClick={() => { if ((Number(item.stock) || 0) > 0) setMovimientos(p => [...p, { id: uid(), fecha: hoy(), tipo: "salida", clase: sub === "modelos" ? "planta" : "repuesto", articuloId: item.id, articuloNombre: item.nombre, cantidad: Number(item.stock) || 0, origen: "Artículo eliminado", creadoEn: new Date().toISOString() }]); setLista(p => p.filter(x => x.id !== item.id)); }} color={RED} outline small>🗑️</Btn>
             </div>
           </div>
         </Card>
@@ -340,25 +345,33 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
 
       {sub === "historial" && (
         <>
-          {movimientos.length === 0 && (
-            <p style={{ color: TEXT_SUB, textAlign: "center", padding: "24px 0", fontSize: 14 }}>
-              Sin movimientos todavía. Se anotan al crear un artículo con stock o al registrar una entrada (📥) en un artículo.
-            </p>
-          )}
-          {[...movimientos].sort((a, b) => (b.creadoEn || "").localeCompare(a.creadoEn || "")).map(m => (
-            <Card key={m.id}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ margin: "0 0 2px", fontWeight: 700, fontSize: 14 }}>{m.clase === "planta" ? "⚡" : "🔩"} {m.articuloNombre}</p>
-                  <p style={{ margin: 0, fontSize: 12.5, color: TEXT_SUB }}>📅 {m.fecha} · {m.origen}</p>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: GREEN }}>+{m.cantidad}</p>
-                  {m.costoTotal > 0 && <p style={{ margin: "2px 0 0", fontSize: 12, color: TEXT_SUB }}>{usd(m.costoTotal)}</p>}
-                </div>
-              </div>
-            </Card>
-          ))}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {[["todo", "Todo"], ["entrada", "📥 Entradas"], ["salida", "📤 Salidas"]].map(([id, label]) => (
+              <button key={id} onClick={() => setHistFiltro(id)} style={{ flex: 1, padding: "9px 6px", borderRadius: 10, border: `2px solid ${histFiltro === id ? ac : BORDER}`, background: histFiltro === id ? ac + "22" : BG_CARD, color: histFiltro === id ? ac : TEXT_SUB, fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>{label}</button>
+            ))}
+          </div>
+          {(() => {
+            const movs = [...movimientos].filter(m => histFiltro === "todo" || m.tipo === histFiltro).sort((a, b) => (b.creadoEn || "").localeCompare(a.creadoEn || ""));
+            if (!movs.length) return <p style={{ color: TEXT_SUB, textAlign: "center", padding: "24px 0", fontSize: 14 }}>{movimientos.length ? "Nada en este filtro." : "Sin movimientos todavía. Se anotan al crear un artículo, al registrar una entrada (📥) y cuando una venta descuenta material."}</p>;
+            return movs.map(m => {
+              const entra = m.tipo !== "salida";
+              const col = entra ? GREEN : RED;
+              return (
+                <Card key={m.id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: "0 0 2px", fontWeight: 700, fontSize: 14 }}>{m.clase === "planta" ? "⚡" : "🔩"} {m.articuloNombre}</p>
+                      <p style={{ margin: 0, fontSize: 12.5, color: TEXT_SUB }}>📅 {m.fecha} · {m.origen}</p>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: col }}>{entra ? "+" : "−"}{m.cantidad}</p>
+                      {m.costoTotal > 0 && <p style={{ margin: "2px 0 0", fontSize: 12, color: TEXT_SUB }}>{usd(m.costoTotal)}</p>}
+                    </div>
+                  </div>
+                </Card>
+              );
+            });
+          })()}
         </>
       )}
 
@@ -650,6 +663,16 @@ export default function App() {
   // ÚNICA puerta por la que el stock baja: la usan la venta directa, la
   // cotización aprobada y el proyecto directo. Si algo queda en negativo, avisa
   // sin bloquear.
+  // Deja constancia en el historial de inventario de cada movimiento, con su
+  // fecha y desde dónde. Así se sigue qué material entró o salió y por qué.
+  const anotarMov = (material, tipo, origen) => {
+    if (!material?.length) return;
+    setMovimientos(p => [...p, ...material.map(m => ({
+      id: uid(), fecha: hoy(), tipo, clase: m.clase, articuloId: m.id, articuloNombre: m.nombre,
+      cantidad: Math.abs(m.cantidad || 0), origen, creadoEn: new Date().toISOString(),
+    }))]);
+  };
+
   const registrarVenta = ({ clienteId, items = [], total, formaPago = "Por definir", origen = "Directa", proyectoId = null, cotizacionId = null, estado = "Pendiente cobro" }) => {
     const consumo = materialDeItems(items);
     if (consumo.length) {
@@ -661,6 +684,7 @@ export default function App() {
     const suma = total ?? items.reduce((sum, i) => sum + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
     const venta = { id: uid(), fecha: hoy(), clienteId, items, total: suma, formaPago, estado, origen, proyectoId, cotizacionId, consumoStock: consumo, creadaEn: new Date().toISOString() };
     setVentas(p => [...p, venta]);
+    anotarMov(consumo, "salida", origen);
     return venta;
   };
 
@@ -671,6 +695,7 @@ export default function App() {
       const r = moverStock(inventario, repuestos, v.consumoStock, +1);
       setInventario(r.inventario);
       setRepuestos(r.repuestos);
+      anotarMov(v.consumoStock, "entrada", "Devolución: venta eliminada");
     }
     setVentas(p => p.filter(x => x.id !== v.id));
     setGarantias(p => p.filter(g => g.ventaId !== v.id));
@@ -692,6 +717,18 @@ export default function App() {
     if (fwd.faltantes.length) setTimeout(() => alert(avisoFaltantes(fwd.faltantes)), 50);
     const total = cambios.items.reduce((s, i) => s + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
     setVentas(p => p.map(v => v.id === ventaId ? { ...v, clienteId: cambios.clienteId, items: cambios.items, formaPago: cambios.formaPago, total, consumoStock: nuevoConsumo } : v));
+    // Anotar en el historial la diferencia de material por la edición.
+    const vMap = new Map((vieja.consumoStock || []).map(m => [m.clase + ":" + m.id, m]));
+    const nMap = new Map(nuevoConsumo.map(m => [m.clase + ":" + m.id, m]));
+    const movs = [];
+    for (const k of new Set([...vMap.keys(), ...nMap.keys()])) {
+      const o = vMap.get(k), n = nMap.get(k);
+      const delta = (n?.cantidad || 0) - (o?.cantidad || 0);
+      if (!delta) continue;
+      const base = n || o;
+      movs.push({ id: uid(), fecha: hoy(), tipo: delta > 0 ? "salida" : "entrada", clase: base.clase, articuloId: base.id, articuloNombre: base.nombre, cantidad: Math.abs(delta), origen: "Venta editada", creadoEn: new Date().toISOString() });
+    }
+    if (movs.length) setMovimientos(p => [...p, ...movs]);
   };
 
   // Crea un proyecto y su tarea de instalación, sin publicar y SIN tocar el
@@ -752,6 +789,7 @@ export default function App() {
       const r = moverStock(inventario, repuestos, venta.consumoStock, +1);
       setInventario(r.inventario);
       setRepuestos(r.repuestos);
+      anotarMov(venta.consumoStock, "entrada", "Devolución: proyecto cancelado");
     }
     if (venta) setVentas(p => p.map(v => v.id === venta.id ? { ...v, estado: "Cancelada" } : v));
     setProyectos(p => p.map(x => x.id === proyecto.id
@@ -771,6 +809,7 @@ export default function App() {
       const r = moverStock(inventario, repuestos, venta.consumoStock, +1);
       setInventario(r.inventario);
       setRepuestos(r.repuestos);
+      anotarMov(venta.consumoStock, "entrada", "Devolución: proyecto eliminado");
     }
     setVentas(p => p.filter(v => v.proyectoId !== proyecto.id));
     setGarantias(p => p.filter(g => g.proyectoId !== proyecto.id));
