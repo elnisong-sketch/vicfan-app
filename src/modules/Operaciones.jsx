@@ -6,6 +6,7 @@ import {
 } from "../ui.jsx";
 import { registrar, estaAbierta, esIncidencia, claseInspeccion, ETIQUETA_ORIGEN, RESULTADO_COLOR } from "./Tareas.jsx";
 import { SelectorCliente, ModalInspeccion } from "./Inspeccion.jsx";
+import { AgregarLinea } from "./Cotizaciones.jsx";
 import { proyectoVacio, tareaDeProyecto, MESES_MANTENIMIENTO, MESES_GARANTIA, diasHasta, garantiaDeProyecto } from "../proyectos.js";
 import { resumenMaterial } from "../inventario.js";
 
@@ -208,13 +209,58 @@ function DetalleProyecto({ proyecto, tareas, garantia, esPlanta, nombreCliente, 
   );
 }
 
+// ── Material que usa un mantenimiento (lo registra la oficina) ──────────────────
+function ModalMaterial({ tarea, inventario, repuestos, nombreCliente, onGuardar, onCerrar }) {
+  const [items, setItems] = useState(() => (tarea.materiales || []).map(m => ({ ...m })));
+
+  const agregar = clave => {
+    const [tipo, i] = clave.split(":");
+    const fuente = tipo === "planta" ? inventario[i] : repuestos[i];
+    if (!fuente) return;
+    setItems(prev => {
+      const ya = prev.find(x => x.clase === tipo && x.id === fuente.id);
+      if (ya) return prev.map(x => (x.clase === tipo && x.id === fuente.id) ? { ...x, cantidad: (Number(x.cantidad) || 0) + 1 } : x);
+      return [...prev, { clase: tipo, id: fuente.id, nombre: fuente.nombre, cantidad: 1 }];
+    });
+  };
+  const cambiar = (it, v) => setItems(prev => prev.map(x => (x.id === it.id && x.clase === it.clase) ? { ...x, cantidad: v } : x));
+  const quitar = it => setItems(prev => prev.filter(x => !(x.id === it.id && x.clase === it.clase)));
+
+  return (
+    <Modal onClose={onCerrar}>
+      <h3 style={{ margin: "0 0 6px", color: ac }}>🔧 Material del mantenimiento</h3>
+      <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}>{nombreCliente(tarea.clienteId)} · {fechaLarga(tarea.fecha)}</p>
+
+      <AgregarLinea inventario={inventario} repuestos={repuestos} onAgregar={agregar} soloInventario placeholder="🔍 Escribe para buscar planta o repuesto…" />
+
+      {items.length === 0 && <p style={{ margin: "0 0 12px", fontSize: 13, color: TEXT_SUB }}>Aún no has añadido material.</p>}
+      {items.map(it => (
+        <div key={it.clase + it.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center", background: BG_INPUT, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "8px 10px", marginBottom: 6 }}>
+          <span style={{ fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.clase === "planta" ? "⚡" : "🔩"} {it.nombre}</span>
+          <input type="number" value={it.cantidad ?? ""} onChange={e => cambiar(it, e.target.value)} style={{ ...estiloInput, width: 70, textAlign: "center" }} />
+          <button onClick={() => quitar(it)} style={{ background: "none", border: "none", color: RED, cursor: "pointer", fontSize: 16, padding: "0 4px" }}>✕</button>
+        </div>
+      ))}
+
+      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+        <Btn onClick={() => onGuardar(items.map(x => ({ ...x, cantidad: Number(x.cantidad) || 0 })).filter(x => x.cantidad > 0))} color={ac} full>Guardar material</Btn>
+        <Btn onClick={onCerrar} color={TEXT_SUB} outline full>Cancelar</Btn>
+      </div>
+      <p style={{ margin: "12px 2px 0", fontSize: 12, color: TEXT_SUB, lineHeight: 1.5 }}>
+        Al guardar, el material se descuenta del inventario y queda en el historial como salida del mantenimiento.
+      </p>
+    </Modal>
+  );
+}
+
 // ── Módulo ─────────────────────────────────────────────────────────────────────
-export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, garantias, setGarantias, crearProyecto, onCancelarProyecto, onEliminarProyecto, onResolverInspeccion }) {
+export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, crearProyecto, onCancelarProyecto, onEliminarProyecto, onGuardarMaterialMantenimiento, onResolverInspeccion }) {
   const garantiaDe = id => garantias.find(g => g.proyectoId === id);
   const [vista, setVista] = useState("proyectos");
   const [busqueda, setBusqueda] = useState("");
   const [modal, setModal] = useState(null);          // "proyecto" | "Visita comercial" | "Incidencia del cliente"
   const [detalle, setDetalle] = useState(null);
+  const [matMant, setMatMant] = useState(null);
 
   const nombreCliente = id => clientes.find(c => c.id === id)?.nombre || "— sin cliente —";
   const crearCliente = c => setClientes(p => [...p, c]);
@@ -363,14 +409,21 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
                 </div>
                 {t.publicada === false && <Badge text="Sin publicar" color={TEXT_SUB} small />}
               </div>
-              {t.publicada === false && (
-                <div style={{ marginTop: 10 }}>
-                  <Btn onClick={() => actualizarTarea(t.id, x => registrar({ ...x, publicada: true }, "Publicada a los técnicos", "Oficina"))} color={ACENTOS.tareas} small full>📢 Publicar a los técnicos</Btn>
-                </div>
-              )}
+              {t.materiales?.length > 0 && <p style={{ margin: "8px 0 0", fontSize: 12.5, color: TEXT_SUB }}>🔧 Material: {t.materiales.reduce((s, m) => s + (Number(m.cantidad) || 0), 0)} u. · {t.materiales.length} artículo(s)</p>}
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                <Btn onClick={() => setMatMant(t)} color={ac} outline small>🔧 Material</Btn>
+                {t.publicada === false && (
+                  <Btn onClick={() => actualizarTarea(t.id, x => registrar({ ...x, publicada: true }, "Publicada a los técnicos", "Oficina"))} color={ACENTOS.tareas} small>📢 Publicar</Btn>
+                )}
+              </div>
             </Card>
           ), color))}
       </>}
+
+      {matMant && (
+        <ModalMaterial tarea={tareas.find(t => t.id === matMant.id) || matMant} inventario={inventario} repuestos={repuestos} nombreCliente={nombreCliente}
+          onGuardar={mats => { onGuardarMaterialMantenimiento(matMant, mats); setMatMant(null); }} onCerrar={() => setMatMant(null)} />
+      )}
 
       {modal === "proyecto" && (
         <ModalProyecto clientes={clientes} onCrearCliente={crearCliente} inventario={inventario}

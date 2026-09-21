@@ -172,7 +172,7 @@ export function NuevoCliente({ onCrear, onCancelar }) {
 // Buscador visible para añadir una línea: se escribe y va filtrando plantas,
 // repuestos y servicios. Sustituye al desplegable nativo, que en el móvil no
 // sacaba teclado y en el ordenador buscaba a ciegas.
-function AgregarLinea({ inventario, repuestos, onAgregar }) {
+export function AgregarLinea({ inventario, repuestos, onAgregar, soloInventario = false, placeholder }) {
   const [texto, setTexto] = useState("");
   const [abierto, setAbierto] = useState(false);
   const norm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -180,7 +180,7 @@ function AgregarLinea({ inventario, repuestos, onAgregar }) {
   const opciones = [
     ...inventario.map((m, i) => ({ k: `planta:${i}`, icono: "⚡", label: m.nombre, extra: usd(m.precio), buscar: norm(`${m.nombre} ${m.codigo || ""} ${m.potencia || ""}`) })),
     ...repuestos.map((r, i) => ({ k: `repuesto:${i}`, icono: "🔩", label: r.nombre, extra: usd(r.precio), buscar: norm(`${r.nombre} ${r.codigo || ""}`) })),
-    ...SERVICIOS_CATALOGO.map((sv, i) => ({ k: `servicio:${i}`, icono: "🔧", label: sv.nombre, extra: "Servicio", buscar: norm(sv.nombre) })),
+    ...(soloInventario ? [] : SERVICIOS_CATALOGO.map((sv, i) => ({ k: `servicio:${i}`, icono: "🔧", label: sv.nombre, extra: "Servicio", buscar: norm(sv.nombre) }))),
   ];
   const filtradas = q ? opciones.filter(o => o.buscar.includes(q)) : opciones;
   const elegir = k => { onAgregar(k); setTexto(""); setAbierto(false); };
@@ -188,7 +188,7 @@ function AgregarLinea({ inventario, repuestos, onAgregar }) {
   return (
     <div style={{ position: "relative", marginBottom: 12 }}>
       <input value={texto} onFocus={() => setAbierto(true)} onChange={e => { setTexto(e.target.value); setAbierto(true); }}
-        placeholder="🔍 Escribe para buscar planta, repuesto o servicio…" style={{ ...estiloInput }} />
+        placeholder={placeholder || "🔍 Escribe para buscar planta, repuesto o servicio…"} style={{ ...estiloInput }} />
       {abierto && (
         <>
           <div onClick={() => setAbierto(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
@@ -201,10 +201,12 @@ function AgregarLinea({ inventario, repuestos, onAgregar }) {
                 <span style={{ color: TEXT_SUB, whiteSpace: "nowrap" }}>{o.extra}</span>
               </button>
             ))}
-            <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => elegir("libre")}
-              style={{ width: "100%", textAlign: "left", background: BG_INPUT, border: "none", padding: "10px 12px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: ac, fontFamily: "inherit" }}>
-              ✏️ Escribir una línea a mano
-            </button>
+            {!soloInventario && (
+              <button type="button" onMouseDown={e => e.preventDefault()} onClick={() => elegir("libre")}
+                style={{ width: "100%", textAlign: "left", background: BG_INPUT, border: "none", padding: "10px 12px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: ac, fontFamily: "inherit" }}>
+                ✏️ Escribir una línea a mano
+              </button>
+            )}
           </div>
         </>
       )}

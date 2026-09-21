@@ -802,6 +802,33 @@ export default function App() {
 
   // Borrado completo de un proyecto creado por error: devuelve el material,
   // borra su venta, sus garantías y sus tareas, y quita el proyecto.
+  // La oficina registra el material de un mantenimiento: ajusta el stock por la
+  // diferencia respecto a lo que ya tenía anotado y lo deja en el historial.
+  const guardarMaterialMantenimiento = (tarea, materiales) => {
+    const nuevos = materiales.map(m => ({ ...m, cantidad: Number(m.cantidad) || 0 })).filter(m => m.cantidad > 0);
+    const viejos = tarea.materiales || [];
+    let inv = inventario, rep = repuestos;
+    if (viejos.length) { const back = moverStock(inv, rep, viejos, +1); inv = back.inventario; rep = back.repuestos; }
+    const fwd = moverStock(inv, rep, nuevos, -1);
+    setInventario(fwd.inventario);
+    setRepuestos(fwd.repuestos);
+    if (fwd.faltantes.length) setTimeout(() => alert(avisoFaltantes(fwd.faltantes)), 50);
+    const vMap = new Map(viejos.map(m => [m.clase + ":" + m.id, m]));
+    const nMap = new Map(nuevos.map(m => [m.clase + ":" + m.id, m]));
+    const cli = clientes.find(c => c.id === tarea.clienteId)?.nombre || "";
+    const origen = `Mantenimiento${cli ? " · " + cli : ""}`;
+    const movs = [];
+    for (const k of new Set([...vMap.keys(), ...nMap.keys()])) {
+      const o = vMap.get(k), n = nMap.get(k);
+      const delta = (n?.cantidad || 0) - (o?.cantidad || 0);
+      if (!delta) continue;
+      const base = n || o;
+      movs.push({ id: uid(), fecha: hoy(), tipo: delta > 0 ? "salida" : "entrada", clase: base.clase, articuloId: base.id, articuloNombre: base.nombre, cantidad: Math.abs(delta), origen, creadoEn: new Date().toISOString() });
+    }
+    if (movs.length) setMovimientos(p => [...p, ...movs]);
+    setTareas(p => p.map(t => t.id === tarea.id ? registrar({ ...t, materiales: nuevos }, "Material del mantenimiento actualizado", "Oficina") : t));
+  };
+
   const eliminarProyecto = proyecto => {
     if (!confirm(`¿Eliminar el proyecto «${proyecto.nombre}»?\n\nSe borran también su venta y sus tareas, y el material vuelve al inventario. No se puede deshacer.`)) return;
     const venta = ventas.find(v => v.proyectoId === proyecto.id && v.estado !== "Cancelada");
@@ -997,9 +1024,9 @@ export default function App() {
         {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} /></>}
         {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} onResolverInspeccion={resolverInspeccion} />}
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
-                                     clientes={clientes} setClientes={setClientes} inventario={inventario}
+                                     clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos}
                                      garantias={garantias} setGarantias={setGarantias}
-                                     crearProyecto={crearProyectoDirecto} onCancelarProyecto={cancelarProyecto} onEliminarProyecto={eliminarProyecto} onResolverInspeccion={resolverInspeccion} />}
+                                     crearProyecto={crearProyectoDirecto} onCancelarProyecto={cancelarProyecto} onEliminarProyecto={eliminarProyecto} onGuardarMaterialMantenimiento={guardarMaterialMantenimiento} onResolverInspeccion={resolverInspeccion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
