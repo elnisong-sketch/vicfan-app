@@ -43,6 +43,21 @@ export const garantiaDeProyecto = (proyecto, { fecha, serial = "", meses = MESES
   activadaEn: new Date().toISOString(),
 });
 
+// Garantía de una planta vendida directamente (sin proyecto). Su id se deriva
+// de la venta para que no se dupliquen.
+export const garantiaDeVenta = (venta, modelo, { fecha, serial = "", meses = MESES_GARANTIA }) => ({
+  id: `gar-v-${venta.id}`,
+  ventaId: venta.id,
+  proyectoNombre: "Venta directa",
+  clienteId: venta.clienteId,
+  modelo: modelo || "",
+  serial: serial.trim(),
+  fechaInstalacion: fecha,
+  mesesGarantia: meses,
+  vence: sumarMeses(fecha, meses),
+  activadaEn: new Date().toISOString(),
+});
+
 export const proyectoVacio = (datos = {}) => ({
   id: uid(),
   nombre: "",

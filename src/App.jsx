@@ -3,12 +3,12 @@ import { useColeccion } from "./datos.js";
 import {
   NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB,
   ACENTOS, ESTADO_COLOR, hoy, usd, uid, sumarMeses, fechaCorta,
-  Badge, Btn, Card, Inp, Sel, Modal, CampoImagen,
+  Badge, Btn, Card, Inp, Sel, Modal, CampoImagen, estiloInput, Etiqueta,
 } from "./ui.jsx";
 import { prepararImagen, prepararLogo } from "./imagenes.js";
 import ModuloTareas, { registrar } from "./modules/Tareas.jsx";
 import ModuloOperaciones from "./modules/Operaciones.jsx";
-import { proyectoVacio, tareaDeProyecto, planAutomatico, diasHasta } from "./proyectos.js";
+import { proyectoVacio, tareaDeProyecto, planAutomatico, diasHasta, garantiaDeVenta } from "./proyectos.js";
 import { materialDeItems, moverStock, avisoFaltantes } from "./inventario.js";
 import ModuloCotizaciones, { EMPRESA_POR_DEFECTO, LineasItems } from "./modules/Cotizaciones.jsx";
 import { SelectorCliente } from "./modules/Inspeccion.jsx";
@@ -78,7 +78,42 @@ function ModuloClientes({ clientes, setClientes }) {
 }
 
 // ── VENTAS ────────────────────────────────────────────────────────────────────
-function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, repuestos, onNuevaVenta, onEliminarVenta }) {
+// Garantía de una planta vendida directamente. Corre desde la puesta en marcha.
+function GarantiaVentaBloque({ planta, garantia, onActivar, onAnular }) {
+  const [abrir, setAbrir] = useState(false);
+  const [fecha, setFecha] = useState(hoy());
+  const [serial, setSerial] = useState("");
+  const verde = ACENTOS.garantias;
+
+  if (garantia) {
+    const dias = diasHasta(garantia.vence);
+    const color = dias > 30 ? GREEN : dias > 0 ? ORANGE : RED;
+    return (
+      <p style={{ margin: "8px 0 0", fontSize: 12.5, color, fontWeight: 700 }}>
+        🛡️ Garantía hasta {fechaCorta(garantia.vence)} ({dias > 0 ? `${dias} días` : "vencida"})
+        <button onClick={onAnular} style={{ marginLeft: 8, background: "none", border: "none", color: TEXT_SUB, textDecoration: "underline", cursor: "pointer", fontSize: 11 }}>anular</button>
+      </p>
+    );
+  }
+  if (!abrir) {
+    return <div style={{ marginTop: 8 }}><Btn onClick={() => setAbrir(true)} color={verde} outline small>🛡️ Activar garantía</Btn></div>;
+  }
+  return (
+    <div style={{ marginTop: 8, border: `1px dashed ${verde}88`, borderRadius: 10, padding: 10 }}>
+      <p style={{ margin: "0 0 8px", fontSize: 12, color: TEXT_SUB, lineHeight: 1.5 }}>Puesta en marcha de {planta.nombre}. Desde ese día corren 24 meses.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+        <input type="date" value={fecha} max={hoy()} onChange={e => setFecha(e.target.value)} style={estiloInput} />
+        <input value={serial} onChange={e => setSerial(e.target.value)} placeholder="Serial (opcional)" style={estiloInput} />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn onClick={() => { onActivar({ fecha, serial }); setAbrir(false); }} color={verde} small disabled={!fecha}>Activar</Btn>
+        <Btn onClick={() => setAbrir(false)} color={TEXT_SUB} outline small>Cancelar</Btn>
+      </div>
+    </div>
+  );
+}
+
+function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, onNuevaVenta, onEliminarVenta }) {
   const ac = ACENTOS.ventas;
   const [modal, setModal] = useState(false);
   const [f, setF] = useState(null);
@@ -89,6 +124,8 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
   const porCobrar = activas.filter(v => v.estado === "Pendiente cobro").reduce((s, v) => s + (v.total || 0), 0);
   const totalF = () => (f?.items || []).reduce((s, i) => s + (Number(i.subtotal) || 0), 0);
   const colorEstado = e => e === "Cobrada" ? GREEN : e === "Cancelada" ? TEXT_SUB : ORANGE;
+  const garantiaDe = id => garantias.find(g => g.ventaId === id);
+  const plantaDe = v => (v.items || []).find(i => i.modeloId);   // primera planta de la venta
 
   const abrir = () => { setF({ clienteId: "", items: [], formaPago: "Efectivo" }); setModal(true); };
   const guardar = () => {
@@ -140,6 +177,12 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
             )}
             <Btn onClick={() => onEliminarVenta(v)} color={RED} outline small>🗑️</Btn>
           </div>
+          {/* Solo las plantas eléctricas tienen garantía; los repuestos no. */}
+          {plantaDe(v) && v.estado !== "Cancelada" && (
+            <GarantiaVentaBloque planta={plantaDe(v)} garantia={garantiaDe(v.id)}
+              onActivar={({ fecha, serial }) => setGarantias(p => { const g = garantiaDeVenta(v, plantaDe(v).nombre, { fecha, serial }); return [...p.filter(x => x.id !== g.id), g]; })}
+              onAnular={() => { if (confirm("¿Anular la garantía de esta venta?")) setGarantias(p => p.filter(x => x.ventaId !== v.id)); }} />
+          )}
         </Card>
       ))}
 
@@ -534,6 +577,7 @@ export default function App() {
       setRepuestos(r.repuestos);
     }
     setVentas(p => p.filter(x => x.id !== v.id));
+    setGarantias(p => p.filter(g => g.ventaId !== v.id));
   };
 
   // Crea un proyecto y su tarea de instalación, sin publicar y SIN tocar el
@@ -602,6 +646,22 @@ export default function App() {
     setTareas(p => p.map(t => (t.proyectoId === proyecto.id && (t.estado === "Programada" || t.estado === "En proceso"))
       ? registrar({ ...t, estado: "Cancelada" }, "Cancelada al cancelar el proyecto", "Oficina")
       : t));
+  };
+
+  // Borrado completo de un proyecto creado por error: devuelve el material,
+  // borra su venta, sus garantías y sus tareas, y quita el proyecto.
+  const eliminarProyecto = proyecto => {
+    if (!confirm(`¿Eliminar el proyecto «${proyecto.nombre}»?\n\nSe borran también su venta y sus tareas, y el material vuelve al inventario. No se puede deshacer.`)) return;
+    const venta = ventas.find(v => v.proyectoId === proyecto.id && v.estado !== "Cancelada");
+    if (venta?.consumoStock?.length) {
+      const r = moverStock(inventario, repuestos, venta.consumoStock, +1);
+      setInventario(r.inventario);
+      setRepuestos(r.repuestos);
+    }
+    setVentas(p => p.filter(v => v.proyectoId !== proyecto.id));
+    setGarantias(p => p.filter(g => g.proyectoId !== proyecto.id));
+    setTareas(p => p.filter(t => t.proyectoId !== proyecto.id));
+    setProyectos(p => p.filter(x => x.id !== proyecto.id));
   };
 
   // Cerrar el círculo de una inspección ya realizada: o se convierte en
@@ -785,11 +845,11 @@ export default function App() {
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario}
                                      garantias={garantias} setGarantias={setGarantias}
-                                     crearProyecto={crearProyectoDirecto} onCancelarProyecto={cancelarProyecto} onResolverInspeccion={resolverInspeccion} />}
+                                     crearProyecto={crearProyectoDirecto} onCancelarProyecto={cancelarProyecto} onEliminarProyecto={eliminarProyecto} onResolverInspeccion={resolverInspeccion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
-        {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEliminarVenta={eliminarVenta} />}
+        {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEliminarVenta={eliminarVenta} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
         {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos}

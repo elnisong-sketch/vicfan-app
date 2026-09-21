@@ -110,7 +110,7 @@ function BloqueGarantia({ garantia, onActivar, onAnular }) {
   );
 }
 
-function DetalleProyecto({ proyecto, tareas, garantia, esPlanta, nombreCliente, onVisita, onCerrarProyecto, onReabrir, onMeses, onActivarGarantia, onAnularGarantia, onCancelarProyecto, onCerrar }) {
+function DetalleProyecto({ proyecto, tareas, garantia, esPlanta, nombreCliente, onVisita, onCerrarProyecto, onReabrir, onMeses, onActivarGarantia, onAnularGarantia, onCancelarProyecto, onEliminarProyecto, onCerrar }) {
   const [tipoVisita, setTipoVisita] = useState("Reparación");
   const [fechaVisita, setFechaVisita] = useState(hoy());
   const suyas = tareas.filter(t => t.proyectoId === proyecto.id).sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -177,6 +177,7 @@ function DetalleProyecto({ proyecto, tareas, garantia, esPlanta, nombreCliente, 
           ? <Btn onClick={onReabrir} color={ORANGE} outline small>↺ Reabrir proyecto</Btn>
           : !cancelado && <Btn onClick={onCerrarProyecto} color={GREEN} small>✓ Cerrar proyecto</Btn>}
         {!cerrado && !cancelado && <Btn onClick={onCancelarProyecto} color={RED} outline small>✗ Cancelar proyecto</Btn>}
+        <Btn onClick={onEliminarProyecto} color={RED} small>🗑️ Eliminar</Btn>
         <Btn onClick={onCerrar} color={TEXT_SUB} outline small>Cerrar</Btn>
       </div>
     </Modal>
@@ -184,7 +185,7 @@ function DetalleProyecto({ proyecto, tareas, garantia, esPlanta, nombreCliente, 
 }
 
 // ── Módulo ─────────────────────────────────────────────────────────────────────
-export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, garantias, setGarantias, crearProyecto, onCancelarProyecto, onResolverInspeccion }) {
+export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, garantias, setGarantias, crearProyecto, onCancelarProyecto, onEliminarProyecto, onResolverInspeccion }) {
   const garantiaDe = id => garantias.find(g => g.proyectoId === id);
   const [vista, setVista] = useState("proyectos");
   const [modal, setModal] = useState(null);          // "proyecto" | "Visita comercial" | "Incidencia del cliente"
@@ -349,6 +350,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
           onCerrarProyecto={() => actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, estado: "Cerrado", fechaCierre: hoy() }, "Cerrado a mano", "Oficina"))}
           onReabrir={() => actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, estado: "Abierto", fechaCierre: null, autoCierre: false }, "Reabierto", "Oficina"))}
           onCancelarProyecto={() => { onCancelarProyecto(proyectoAbierto); setDetalle(null); }}
+          onEliminarProyecto={() => { onEliminarProyecto(proyectoAbierto); setDetalle(null); }}
           garantia={garantiaDe(proyectoAbierto.id)}
           esPlanta={inventario.some(m => m.nombre === proyectoAbierto.equipo)}
           onActivarGarantia={({ fecha, serial }) => {

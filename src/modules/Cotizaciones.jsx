@@ -351,6 +351,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
               <Btn onClick={() => onAprobar(q)} color={GREEN} small full>✓ Aprobar y crear tarea</Btn>
               <Btn onClick={() => abrirEdicion(q)} color={ac} outline small>✏️</Btn>
               <Btn onClick={() => setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Rechazada" } : x))} color={RED} outline small>✗</Btn>
+              <Btn onClick={() => confirm("¿Eliminar esta cotización?") && setCotizaciones(p => p.filter(x => x.id !== q.id))} color={RED} small>🗑️</Btn>
             </div>
           )}
           {/* Una cotización aprobada se sigue pudiendo modificar: el cliente
@@ -359,11 +360,13 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB, flex: 1 }}>✓ Aprobada · generó una tarea en 📅 Tareas</p>
               <Btn onClick={() => abrirEdicion(q)} color={ac} outline small>✏️ Modificar</Btn>
+              <Btn onClick={() => confirm("¿Eliminar esta cotización?\n\nSe borra solo la cotización. El proyecto y la venta que generó NO se borran; elimínalos por separado si hace falta.") && setCotizaciones(p => p.filter(x => x.id !== q.id))} color={RED} outline small>🗑️</Btn>
             </div>
           )}
           {q.estado === "Rechazada" && (
             <div style={{ display: "flex", gap: 8 }}>
               <Btn onClick={() => setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Pendiente" } : x))} color={ac} outline small>↺ Volver a pendiente</Btn>
+              <Btn onClick={() => confirm("¿Eliminar esta cotización?") && setCotizaciones(p => p.filter(x => x.id !== q.id))} color={RED} small>🗑️</Btn>
             </div>
           )}
         </Card>
