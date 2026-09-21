@@ -485,7 +485,7 @@ function Observaciones({ notas, onAgregar, onBorrador, onEditar, onBorrar, puede
 }
 
 // ── MODAL: DETALLE / HISTORIAL ────────────────────────────────────────────────
-function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, onCancelarTarea, onFotos, onObservacion, onEditarObservacion, onBorrarObservacion, onReabrir, onPublicar, onResolver, onCerrar }) {
+function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, onCancelarTarea, onEliminar, onFotos, onObservacion, onEditarObservacion, onBorrarObservacion, onReabrir, onPublicar, onResolver, onCerrar }) {
   const [nuevaFecha, setNuevaFecha] = useState(tarea.fecha);
   const [reprogramando, setReprogramando] = useState(false);
   const [confirmarReapertura, setConfirmarReapertura] = useState(false);
@@ -637,6 +637,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
             <Btn onClick={onEditar} color={ac} outline small>✏️ Editar</Btn>
             <Btn onClick={() => setReprogramando(true)} color={ORANGE} outline small>📅 Reprogramar</Btn>
             <Btn onClick={onCancelarTarea} color={RED} outline small>✕ Cancelar tarea</Btn>
+            <Btn onClick={onEliminar} color={RED} small>🗑️ Eliminar</Btn>
           </>}
           {!estaAbierta(tarea) && <Btn onClick={() => setConfirmarReapertura(true)} color={ORANGE} outline small>↺ Reabrir tarea</Btn>}
         </div>
@@ -735,6 +736,14 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
   const cancelarTarea = t => {
     if (!confirm("¿Cancelar esta tarea?")) return;
     actualizar(t.id, x => registrar({ ...x, estado: "Cancelada" }, "Cancelada", quienActua));
+    setDetalle(null);
+  };
+
+  // Borrado de verdad, para las tareas creadas por error. No deja rastro: se
+  // usa solo cuando la tarea no debería haber existido.
+  const eliminarTarea = t => {
+    if (!confirm("¿Eliminar esta tarea?\n\nSe borra por completo y no se puede deshacer. Úsalo solo si se creó por error.")) return;
+    setTareas(p => p.filter(x => x.id !== t.id));
     setDetalle(null);
   };
 
@@ -888,6 +897,7 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
           onEditar={() => { setForm({ ...detalle }); setDetalle(null); }}
           onReprogramar={f => reprogramar(detalle, f)}
           onCancelarTarea={() => cancelarTarea(detalle)}
+          onEliminar={() => eliminarTarea(detalle)}
           onFotos={(fotos, info) => actualizar(detalle.id, x =>
             info?.accion ? registrar({ ...x, fotos }, info.accion, quienActua) : { ...x, fotos })}
           onObservacion={texto => agregarObservacion(detalle, texto)}

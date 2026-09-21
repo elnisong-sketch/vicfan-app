@@ -9,8 +9,9 @@ import { prepararImagen, prepararLogo } from "./imagenes.js";
 import ModuloTareas, { registrar } from "./modules/Tareas.jsx";
 import ModuloOperaciones from "./modules/Operaciones.jsx";
 import { proyectoVacio, tareaDeProyecto, planAutomatico, diasHasta } from "./proyectos.js";
-import { materialDeItems, equipoComoMaterial, moverStock, avisoFaltantes } from "./inventario.js";
-import ModuloCotizaciones, { EMPRESA_POR_DEFECTO } from "./modules/Cotizaciones.jsx";
+import { materialDeItems, moverStock, avisoFaltantes } from "./inventario.js";
+import ModuloCotizaciones, { EMPRESA_POR_DEFECTO, LineasItems } from "./modules/Cotizaciones.jsx";
+import { SelectorCliente } from "./modules/Inspeccion.jsx";
 import PantallaLogin from "./sesion.jsx";
 import { useSesion, salir as cerrarSesion } from "./auth.js";
 import Usuarios from "./modules/Usuarios.jsx";
@@ -77,32 +78,90 @@ function ModuloClientes({ clientes, setClientes }) {
 }
 
 // ── VENTAS ────────────────────────────────────────────────────────────────────
-function ModuloVentas({ ventas, setVentas, clientes }) {
+function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, repuestos, onNuevaVenta, onEliminarVenta }) {
   const ac = ACENTOS.ventas;
+  const [modal, setModal] = useState(false);
+  const [f, setF] = useState(null);
   const nc = id => clientes.find(c => c.id === id)?.nombre || "—";
-  const totalCobrado = ventas.filter(v => v.estado === "Cobrada").reduce((s, v) => s + (v.total || 0), 0);
+
+  const activas = ventas.filter(v => v.estado !== "Cancelada");
+  const cobrado = activas.filter(v => v.estado === "Cobrada").reduce((s, v) => s + (v.total || 0), 0);
+  const porCobrar = activas.filter(v => v.estado === "Pendiente cobro").reduce((s, v) => s + (v.total || 0), 0);
+  const totalF = () => (f?.items || []).reduce((s, i) => s + (Number(i.subtotal) || 0), 0);
+  const colorEstado = e => e === "Cobrada" ? GREEN : e === "Cancelada" ? TEXT_SUB : ORANGE;
+
+  const abrir = () => { setF({ clienteId: "", items: [], formaPago: "Efectivo" }); setModal(true); };
+  const guardar = () => {
+    if (!f.clienteId || f.items.length === 0) return;
+    onNuevaVenta({ clienteId: f.clienteId, items: f.items, formaPago: f.formaPago });
+    setModal(false);
+  };
+
   return (
     <div>
-      <h2 style={{ color: ac, margin: "0 0 12px", fontSize: 18, fontWeight: 900 }}>💰 Ventas</h2>
-      <Card style={{ background: `linear-gradient(135deg, ${ac}22, ${ac}11)`, border: `1px solid ${ac}33` }}>
-        <p style={{ margin: 0, color: TEXT_SUB, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Total cobrado</p>
-        <p style={{ margin: "4px 0 0", color: ac, fontSize: 28, fontWeight: 900 }}>{usd(totalCobrado)}</p>
-      </Card>
-      {ventas.map(v => (
-        <Card key={v.id}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-            <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>💰 Ventas</h2>
+        <Btn onClick={abrir} color={ac} small>+ Venta directa</Btn>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+        <Card style={{ background: `linear-gradient(135deg, ${GREEN}22, ${GREEN}11)`, border: `1px solid ${GREEN}33` }}>
+          <p style={{ margin: 0, color: TEXT_SUB, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase" }}>Cobrado</p>
+          <p style={{ margin: "4px 0 0", color: GREEN, fontSize: 22, fontWeight: 900 }}>{usd(cobrado)}</p>
+        </Card>
+        <Card style={{ background: `linear-gradient(135deg, ${ORANGE}22, ${ORANGE}11)`, border: `1px solid ${ORANGE}33` }}>
+          <p style={{ margin: 0, color: TEXT_SUB, fontSize: 10.5, fontWeight: 700, textTransform: "uppercase" }}>Por cobrar</p>
+          <p style={{ margin: "4px 0 0", color: ORANGE, fontSize: 22, fontWeight: 900 }}>{usd(porCobrar)}</p>
+        </Card>
+      </div>
+
+      {ventas.length === 0 && (
+        <p style={{ color: TEXT_SUB, textAlign: "center", padding: "24px 0", fontSize: 14 }}>
+          Sin ventas todavía. Se crean aquí, o solas al aprobar una cotización o crear un proyecto.
+        </p>
+      )}
+
+      {[...ventas].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")).map(v => (
+        <Card key={v.id} style={{ opacity: v.estado === "Cancelada" ? 0.55 : 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
+            <div style={{ minWidth: 0 }}>
               <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15 }}>{nc(v.clienteId)}</p>
-              <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB }}>📅 {v.fecha} · 💳 {v.formaPago}</p>
+              <p style={{ margin: "0 0 2px", fontSize: 13, color: TEXT_SUB }}>📅 {v.fecha} · 💳 {v.formaPago}</p>
+              <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB }}>{v.origen}{v.items?.length ? ` · ${v.items.length} ítem(s)` : ""}</p>
             </div>
             <div style={{ textAlign: "right" }}>
               <p style={{ margin: "0 0 6px", fontWeight: 800, fontSize: 16, color: ac }}>{usd(v.total)}</p>
-              <Badge text={v.estado} color={ESTADO_COLOR[v.estado] || "#888"} />
+              <Badge text={v.estado} color={colorEstado(v.estado)} />
             </div>
           </div>
-          {v.estado === "Pendiente cobro" && <Btn onClick={() => setVentas(p => p.map(x => x.id === v.id ? { ...x, estado: "Cobrada" } : x))} color={GREEN} small full>✓ Marcar cobrada</Btn>}
+          <div style={{ display: "flex", gap: 8 }}>
+            {v.estado === "Pendiente cobro" && (
+              <Btn onClick={() => setVentas(p => p.map(x => x.id === v.id ? { ...x, estado: "Cobrada" } : x))} color={GREEN} small>✓ Marcar cobrada</Btn>
+            )}
+            <Btn onClick={() => onEliminarVenta(v)} color={RED} outline small>🗑️</Btn>
+          </div>
         </Card>
       ))}
+
+      {modal && f && (
+        <Modal onClose={() => setModal(false)}>
+          <h3 style={{ margin: "0 0 16px", color: ac }}>💰 Nueva venta directa</h3>
+          <SelectorCliente clientes={clientes} valor={f.clienteId} onCambio={id => setF(x => ({ ...x, clienteId: id }))} onCrear={c => setClientes(p => [...p, c])} />
+          <LineasItems items={f.items} onCambio={items => setF(x => ({ ...x, items }))} inventario={inventario} repuestos={repuestos} />
+          <Sel label="Forma de pago" value={f.formaPago} onChange={v => setF(x => ({ ...x, formaPago: v }))}
+            options={["Efectivo", "Transferencia", "Pago móvil", "Zelle", "Divisas", "Por definir"].map(o => ({ value: o, label: o }))} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 16, margin: "4px 2px 14px" }}>
+            <span>TOTAL</span><span style={{ color: ac }}>{usd(totalF())}</span>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={guardar} color={ac} full disabled={!f.clienteId || f.items.length === 0}>Registrar venta</Btn>
+            <Btn onClick={() => setModal(false)} color={TEXT_SUB} outline full>Cancelar</Btn>
+          </div>
+          <p style={{ margin: "12px 2px 0", fontSize: 12, color: TEXT_SUB, lineHeight: 1.5 }}>
+            Descuenta el material del inventario. No genera cotización, proyecto ni tarea.
+          </p>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -448,19 +507,41 @@ export default function App() {
   // Crea un proyecto y su tarea de instalación, sin publicar. Es la puerta
   // común de las tres formas de empezar un trabajo: una cotización aprobada,
   // una inspección que se concretó o un proyecto creado directamente.
-  const crearProyecto = (datos, tarea = {}) => {
-    // El material sale del inventario en cuanto se aprueba el trabajo. De una
-    // cotización viene su lista de líneas; de un proyecto directo, su equipo si
-    // coincide con una planta del catálogo.
-    const consumo = datos.consumo || equipoComoMaterial(datos.equipo, inventario);
-    const { consumo: _c, ...limpio } = datos;
-    const proyecto = registrar(proyectoVacio({ ...limpio, consumoStock: consumo }), `Creado (${datos.origen || "Directo"})`, "Oficina");
+  // Registra una venta y descuenta su material del inventario en el acto. Es la
+  // ÚNICA puerta por la que el stock baja: la usan la venta directa, la
+  // cotización aprobada y el proyecto directo. Si algo queda en negativo, avisa
+  // sin bloquear.
+  const registrarVenta = ({ clienteId, items = [], total, formaPago = "Por definir", origen = "Directa", proyectoId = null, cotizacionId = null, estado = "Pendiente cobro" }) => {
+    const consumo = materialDeItems(items);
     if (consumo.length) {
       const r = moverStock(inventario, repuestos, consumo, -1);
       setInventario(r.inventario);
       setRepuestos(r.repuestos);
       if (r.faltantes.length) setTimeout(() => alert(avisoFaltantes(r.faltantes)), 50);
     }
+    const suma = total ?? items.reduce((sum, i) => sum + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
+    const venta = { id: uid(), fecha: hoy(), clienteId, items, total: suma, formaPago, estado, origen, proyectoId, cotizacionId, consumoStock: consumo, creadaEn: new Date().toISOString() };
+    setVentas(p => [...p, venta]);
+    return venta;
+  };
+
+  // Eliminar una venta le devuelve al inventario su material.
+  const eliminarVenta = v => {
+    if (!confirm("¿Eliminar esta venta?\n\nSi tenía material, volverá al inventario. No se puede deshacer.")) return;
+    if (v.consumoStock?.length && v.estado !== "Cancelada") {
+      const r = moverStock(inventario, repuestos, v.consumoStock, +1);
+      setInventario(r.inventario);
+      setRepuestos(r.repuestos);
+    }
+    setVentas(p => p.filter(x => x.id !== v.id));
+  };
+
+  // Crea un proyecto y su tarea de instalación, sin publicar y SIN tocar el
+  // stock: quien descuenta es la venta. Base común de una cotización aprobada,
+  // una inspección concretada o un proyecto directo.
+  const crearProyecto = (datos, tarea = {}) => {
+    const { consumo, ventaItems, precioVenta, ...limpio } = datos;
+    const proyecto = registrar(proyectoVacio(limpio), `Creado (${datos.origen || "Directo"})`, "Oficina");
     setProyectos(p => [...p, proyecto]);
     setTareas(p => [...p, registrar(tareaDeProyecto(proyecto, {
       tipo: "Instalación",
@@ -471,12 +552,24 @@ export default function App() {
     return proyecto;
   };
 
+  // Proyecto creado directamente en la oficina: además del proyecto y su tarea,
+  // genera su venta (el equipo como artículo, si es una planta del inventario)
+  // y descuenta el stock.
+  const crearProyectoDirecto = (datos, tarea = {}) => {
+    const proyecto = crearProyecto(datos, tarea);
+    const precio = Number(datos.precioVenta) || 0;
+    const planta = datos.equipo ? inventario.find(m => m.nombre === datos.equipo) : null;
+    const items = datos.equipo ? [{ id: uid(), modeloId: planta?.id, nombre: datos.equipo, cantidad: 1, precio, subtotal: precio }] : [];
+    registrarVenta({ clienteId: datos.clienteId, items, total: precio, origen: `Proyecto: ${proyecto.nombre}`, proyectoId: proyecto.id });
+    return proyecto;
+  };
+
   // Aprobar una cotización abre su proyecto con la tarea de instalación, que
   // nace sin publicar: la oficina la agenda y decide cuándo la ve el técnico.
   const aprobarCotizacion = q => {
     setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Aprobada" } : x));
     const alcance = alcanceDeCotizacion(q);
-    crearProyecto({
+    const proyecto = crearProyecto({
       nombre: `Instalación ${alcance.modelo || "cotización " + q.numero}`,
       clienteId: q.clienteId,
       direccion: clientes.find(c => c.id === q.clienteId)?.direccion || "",
@@ -485,8 +578,9 @@ export default function App() {
       origen: `Cotización Nº ${q.numero}`,
       cotizacionId: q.id,
       inspeccionId: q.inspeccionId || null,
-      consumo: materialDeItems(q.items),
     }, { duracionDias: 2, cotizacionId: q.id, costo: alcance.costo });
+    // La cotización aprobada es ya una venta: descuenta su material.
+    registrarVenta({ clienteId: q.clienteId, items: q.items, total: q.total, origen: `Cotización Nº ${q.numero}`, proyectoId: proyecto.id, cotizacionId: q.id });
     setTab("tareas");
   };
 
@@ -494,14 +588,16 @@ export default function App() {
   // salido y da por cerradas sus tareas pendientes. Es la vuelta atrás de una
   // venta que al final no fue.
   const cancelarProyecto = proyecto => {
-    if (!confirm(`¿Cancelar el proyecto «${proyecto.nombre}»?\n\nEl material descontado volverá al inventario y sus visitas pendientes se cancelarán.`)) return;
-    if (proyecto.consumoStock?.length) {
-      const r = moverStock(inventario, repuestos, proyecto.consumoStock, +1);
+    if (!confirm(`¿Cancelar el proyecto «${proyecto.nombre}»?\n\nSu venta se anula, el material vuelve al inventario y sus visitas pendientes se cancelan.`)) return;
+    const venta = ventas.find(v => v.proyectoId === proyecto.id && v.estado !== "Cancelada");
+    if (venta?.consumoStock?.length) {
+      const r = moverStock(inventario, repuestos, venta.consumoStock, +1);
       setInventario(r.inventario);
       setRepuestos(r.repuestos);
     }
+    if (venta) setVentas(p => p.map(v => v.id === venta.id ? { ...v, estado: "Cancelada" } : v));
     setProyectos(p => p.map(x => x.id === proyecto.id
-      ? registrar({ ...x, estado: "Cancelado", autoCierre: false, consumoStock: [] }, "Proyecto cancelado · material devuelto al inventario", "Oficina")
+      ? registrar({ ...x, estado: "Cancelado", autoCierre: false }, "Proyecto cancelado · venta anulada y material devuelto", "Oficina")
       : x));
     setTareas(p => p.map(t => (t.proyectoId === proyecto.id && (t.estado === "Programada" || t.estado === "En proceso"))
       ? registrar({ ...t, estado: "Cancelada" }, "Cancelada al cancelar el proyecto", "Oficina")
@@ -689,11 +785,11 @@ export default function App() {
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario}
                                      garantias={garantias} setGarantias={setGarantias}
-                                     crearProyecto={crearProyecto} onCancelarProyecto={cancelarProyecto} onResolverInspeccion={resolverInspeccion} />}
+                                     crearProyecto={crearProyectoDirecto} onCancelarProyecto={cancelarProyecto} onResolverInspeccion={resolverInspeccion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
-        {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} />}
+        {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEliminarVenta={eliminarVenta} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
         {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos}

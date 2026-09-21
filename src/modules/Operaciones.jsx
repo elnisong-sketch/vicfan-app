@@ -43,6 +43,7 @@ function ModalProyecto({ clientes, onCrearCliente, inventario, onGuardar, onCerr
       <Inp label="Nombre del proyecto" value={f.nombre} onChange={v => set("nombre", v)} placeholder="Instalación Generac 26kW" />
       <Inp label="Dirección" value={f.direccion} onChange={v => set("direccion", v)} />
       <Area label="Alcance del trabajo" value={f.descripcion} onChange={v => set("descripcion", v)} placeholder="Qué incluye, instrucciones para el técnico…" />
+      <Inp label="Precio de venta ($)" type="number" value={f.precioVenta ?? ""} onChange={v => set("precioVenta", v)} placeholder="0" />
 
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10 }}>
         <Inp label="Inicio de la instalación" type="date" value={f.fechaInicio} onChange={v => set("fechaInicio", v)} />
@@ -109,7 +110,7 @@ function BloqueGarantia({ garantia, onActivar, onAnular }) {
   );
 }
 
-function DetalleProyecto({ proyecto, tareas, garantia, nombreCliente, onVisita, onCerrarProyecto, onReabrir, onMeses, onActivarGarantia, onAnularGarantia, onCancelarProyecto, onCerrar }) {
+function DetalleProyecto({ proyecto, tareas, garantia, esPlanta, nombreCliente, onVisita, onCerrarProyecto, onReabrir, onMeses, onActivarGarantia, onAnularGarantia, onCancelarProyecto, onCerrar }) {
   const [tipoVisita, setTipoVisita] = useState("Reparación");
   const [fechaVisita, setFechaVisita] = useState(hoy());
   const suyas = tareas.filter(t => t.proyectoId === proyecto.id).sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -135,7 +136,8 @@ function DetalleProyecto({ proyecto, tareas, garantia, nombreCliente, onVisita, 
         {proyecto.consumoStock?.length > 0 && <div>📦 <b>Material descontado:</b> {resumenMaterial(proyecto.consumoStock)}</div>}
       </div>
 
-      <BloqueGarantia garantia={garantia} onActivar={onActivarGarantia} onAnular={onAnularGarantia} />
+      {/* Solo las plantas eléctricas tienen garantía; los repuestos no. */}
+      {esPlanta && <BloqueGarantia garantia={garantia} onActivar={onActivarGarantia} onAnular={onAnularGarantia} />}
 
       <Sel label="Mantenimiento" value={String(proyecto.mantenimientoMeses ?? 6)} onChange={v => onMeses(Number(v))}
         options={MESES_MANTENIMIENTO.map(o => ({ value: String(o.value), label: o.label }))} />
@@ -348,6 +350,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
           onReabrir={() => actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, estado: "Abierto", fechaCierre: null, autoCierre: false }, "Reabierto", "Oficina"))}
           onCancelarProyecto={() => { onCancelarProyecto(proyectoAbierto); setDetalle(null); }}
           garantia={garantiaDe(proyectoAbierto.id)}
+          esPlanta={inventario.some(m => m.nombre === proyectoAbierto.equipo)}
           onActivarGarantia={({ fecha, serial }) => {
             const g = garantiaDeProyecto(proyectoAbierto, { fecha, serial });
             setGarantias(p => [...p.filter(x => x.id !== g.id), g]);

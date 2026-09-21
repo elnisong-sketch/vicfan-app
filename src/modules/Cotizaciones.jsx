@@ -169,7 +169,7 @@ export function NuevoCliente({ onCrear, onCancelar }) {
 }
 
 // ── LÍNEAS DEL PRESUPUESTO ────────────────────────────────────────────────────
-function LineasItems({ items, onCambio, inventario, repuestos }) {
+export function LineasItems({ items, onCambio, inventario, repuestos }) {
   const [aAgregar, setAAgregar] = useState("");
 
   const agregar = valor => {
