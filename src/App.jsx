@@ -113,10 +113,11 @@ function GarantiaVentaBloque({ planta, garantia, onActivar, onAnular }) {
   );
 }
 
-function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, onNuevaVenta, onEliminarVenta }) {
+function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, onNuevaVenta, onEditarVenta, onEliminarVenta }) {
   const ac = ACENTOS.ventas;
   const [modal, setModal] = useState(false);
   const [f, setF] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
   const nc = id => clientes.find(c => c.id === id)?.nombre || "—";
 
   const activas = ventas.filter(v => v.estado !== "Cancelada");
@@ -127,10 +128,18 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
   const garantiaDe = id => garantias.find(g => g.ventaId === id);
   const plantaDe = v => (v.items || []).find(i => i.modeloId);   // primera planta de la venta
 
+  const norm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const q = norm(busqueda);
+  const visibles = [...ventas]
+    .filter(v => !q || norm(nc(v.clienteId)).includes(q) || norm(v.origen).includes(q) || (v.items || []).some(i => norm(i.nombre).includes(q)))
+    .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+
   const abrir = () => { setF({ clienteId: "", items: [], formaPago: "Efectivo" }); setModal(true); };
+  const editar = v => { setF({ id: v.id, clienteId: v.clienteId, items: (v.items || []).map(i => ({ ...i })), formaPago: v.formaPago }); setModal(true); };
   const guardar = () => {
     if (!f.clienteId || f.items.length === 0) return;
-    onNuevaVenta({ clienteId: f.clienteId, items: f.items, formaPago: f.formaPago });
+    if (f.id) onEditarVenta(f.id, { clienteId: f.clienteId, items: f.items, formaPago: f.formaPago });
+    else onNuevaVenta({ clienteId: f.clienteId, items: f.items, formaPago: f.formaPago });
     setModal(false);
   };
 
@@ -152,13 +161,26 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
         </Card>
       </div>
 
+      {ventas.length > 0 && (
+        <div style={{ position: "relative", marginBottom: 14 }}>
+          <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por cliente, artículo u origen…"
+            style={{ width: "100%", boxSizing: "border-box", padding: "11px 36px 11px 12px", borderRadius: 12, border: `1px solid ${BORDER}`, background: BG_CARD, color: TEXT_MAIN, fontSize: 14, fontFamily: "inherit" }} />
+          {busqueda
+            ? <button onClick={() => setBusqueda("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: TEXT_SUB, fontSize: 15, cursor: "pointer", padding: 4 }}>✕</button>
+            : <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: TEXT_SUB, fontSize: 14, pointerEvents: "none" }}>🔍</span>}
+        </div>
+      )}
+
       {ventas.length === 0 && (
         <p style={{ color: TEXT_SUB, textAlign: "center", padding: "24px 0", fontSize: 14 }}>
           Sin ventas todavía. Se crean aquí, o solas al aprobar una cotización o crear un proyecto.
         </p>
       )}
+      {ventas.length > 0 && visibles.length === 0 && (
+        <p style={{ color: TEXT_SUB, textAlign: "center", padding: "24px 0", fontSize: 14 }}>Nada coincide con la búsqueda.</p>
+      )}
 
-      {[...ventas].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")).map(v => (
+      {visibles.map(v => (
         <Card key={v.id} style={{ opacity: v.estado === "Cancelada" ? 0.55 : 1 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
             <div style={{ minWidth: 0 }}>
@@ -175,6 +197,7 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
             {v.estado === "Pendiente cobro" && (
               <Btn onClick={() => setVentas(p => p.map(x => x.id === v.id ? { ...x, estado: "Cobrada" } : x))} color={GREEN} small>✓ Marcar cobrada</Btn>
             )}
+            {v.estado !== "Cancelada" && <Btn onClick={() => editar(v)} color={ac} outline small>✏️</Btn>}
             <Btn onClick={() => onEliminarVenta(v)} color={RED} outline small>🗑️</Btn>
           </div>
           {/* Solo las plantas eléctricas tienen garantía; los repuestos no. */}
@@ -188,7 +211,7 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
 
       {modal && f && (
         <Modal onClose={() => setModal(false)}>
-          <h3 style={{ margin: "0 0 16px", color: ac }}>💰 Nueva venta directa</h3>
+          <h3 style={{ margin: "0 0 16px", color: ac }}>{f.id ? "✏️ Editar venta" : "💰 Nueva venta directa"}</h3>
           <SelectorCliente clientes={clientes} valor={f.clienteId} onCambio={id => setF(x => ({ ...x, clienteId: id }))} onCrear={c => setClientes(p => [...p, c])} />
           <LineasItems items={f.items} onCambio={items => setF(x => ({ ...x, items }))} inventario={inventario} repuestos={repuestos} />
           <Sel label="Forma de pago" value={f.formaPago} onChange={v => setF(x => ({ ...x, formaPago: v }))}
@@ -197,11 +220,11 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
             <span>TOTAL</span><span style={{ color: ac }}>{usd(totalF())}</span>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <Btn onClick={guardar} color={ac} full disabled={!f.clienteId || f.items.length === 0}>Registrar venta</Btn>
+            <Btn onClick={guardar} color={ac} full disabled={!f.clienteId || f.items.length === 0}>{f.id ? "Guardar cambios" : "Registrar venta"}</Btn>
             <Btn onClick={() => setModal(false)} color={TEXT_SUB} outline full>Cancelar</Btn>
           </div>
           <p style={{ margin: "12px 2px 0", fontSize: 12, color: TEXT_SUB, lineHeight: 1.5 }}>
-            Descuenta el material del inventario. No genera cotización, proyecto ni tarea.
+            {f.id ? "Al cambiar los artículos, el inventario se ajusta por la diferencia." : "Descuenta el material del inventario. No genera cotización, proyecto ni tarea."}
           </p>
         </Modal>
       )}
@@ -580,6 +603,24 @@ export default function App() {
     setGarantias(p => p.filter(g => g.ventaId !== v.id));
   };
 
+  // Editar una venta (p. ej. un precio mal puesto). Ajusta el inventario por la
+  // diferencia: devuelve lo que descontaba antes y descuenta lo nuevo.
+  const editarVenta = (ventaId, cambios) => {
+    const vieja = ventas.find(v => v.id === ventaId);
+    if (!vieja) return;
+    const nuevoConsumo = materialDeItems(cambios.items);
+    let inv = inventario, rep = repuestos;
+    if (vieja.estado !== "Cancelada" && vieja.consumoStock?.length) {
+      const back = moverStock(inv, rep, vieja.consumoStock, +1); inv = back.inventario; rep = back.repuestos;
+    }
+    const fwd = moverStock(inv, rep, nuevoConsumo, -1);
+    setInventario(fwd.inventario);
+    setRepuestos(fwd.repuestos);
+    if (fwd.faltantes.length) setTimeout(() => alert(avisoFaltantes(fwd.faltantes)), 50);
+    const total = cambios.items.reduce((s, i) => s + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
+    setVentas(p => p.map(v => v.id === ventaId ? { ...v, clienteId: cambios.clienteId, items: cambios.items, formaPago: cambios.formaPago, total, consumoStock: nuevoConsumo } : v));
+  };
+
   // Crea un proyecto y su tarea de instalación, sin publicar y SIN tocar el
   // stock: quien descuenta es la venta. Base común de una cotización aprobada,
   // una inspección concretada o un proyecto directo.
@@ -849,7 +890,7 @@ export default function App() {
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
-        {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEliminarVenta={eliminarVenta} />}
+        {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEditarVenta={editarVenta} onEliminarVenta={eliminarVenta} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
         {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos}

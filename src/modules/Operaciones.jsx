@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  ACENTOS, ESTADO_COLOR, PRIORIDAD_COLOR, BG_INPUT, BORDER, TEXT_SUB, GREEN, ORANGE, RED,
+  ACENTOS, ESTADO_COLOR, PRIORIDAD_COLOR, BG_INPUT, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB, GREEN, ORANGE, RED,
   hoy, fechaCorta, fechaLarga, sumarDias, esPasado,
   Badge, Btn, Card, Inp, Area, Sel, Modal, Chips, Etiqueta, estiloInput,
 } from "../ui.jsx";
@@ -188,6 +188,7 @@ function DetalleProyecto({ proyecto, tareas, garantia, esPlanta, nombreCliente, 
 export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, garantias, setGarantias, crearProyecto, onCancelarProyecto, onEliminarProyecto, onResolverInspeccion }) {
   const garantiaDe = id => garantias.find(g => g.proyectoId === id);
   const [vista, setVista] = useState("proyectos");
+  const [busqueda, setBusqueda] = useState("");
   const [modal, setModal] = useState(null);          // "proyecto" | "Visita comercial" | "Incidencia del cliente"
   const [detalle, setDetalle] = useState(null);
 
@@ -206,8 +207,10 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
   const proximos = mants.filter(t => !esPasado(t.fecha) && t.fecha <= sumarDias(hoy(), 60));
   const masAdelante = mants.filter(t => t.fecha > sumarDias(hoy(), 60));
 
-  const abiertos = proyectos.filter(p => p.estado !== "Cerrado" && p.estado !== "Cancelado");
-  const cerrados = proyectos.filter(p => p.estado === "Cerrado" || p.estado === "Cancelado");
+  const nrm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const filtroBusq = p => { const s = nrm(busqueda); return !s || nrm(p.nombre).includes(s) || nrm(nombreCliente(p.clienteId)).includes(s) || nrm(p.equipo).includes(s); };
+  const abiertos = proyectos.filter(p => p.estado !== "Cerrado" && p.estado !== "Cancelado").filter(filtroBusq);
+  const cerrados = proyectos.filter(p => (p.estado === "Cerrado" || p.estado === "Cancelado")).filter(filtroBusq);
 
   const guardarInspeccion = f => {
     setTareas(p => [...p, registrar(f, `Inspección creada (${ETIQUETA_ORIGEN[f.origen]})`, "Oficina")]);
@@ -299,6 +302,15 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       {vista === "proyectos" && <>
         <Btn onClick={() => setModal("proyecto")} color={ac} small>+ Nuevo proyecto</Btn>
         <div style={{ height: 14 }} />
+        {proyectos.length > 0 && (
+          <div style={{ position: "relative", marginBottom: 14 }}>
+            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por proyecto, cliente o equipo…"
+              style={{ width: "100%", boxSizing: "border-box", padding: "11px 36px 11px 12px", borderRadius: 12, border: `1px solid ${BORDER}`, background: BG_CARD, color: TEXT_SUB, fontSize: 14, fontFamily: "inherit" }} />
+            {busqueda
+              ? <button onClick={() => setBusqueda("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: TEXT_SUB, fontSize: 15, cursor: "pointer", padding: 4 }}>✕</button>
+              : <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: TEXT_SUB, fontSize: 14, pointerEvents: "none" }}>🔍</span>}
+          </div>
+        )}
         {proyectos.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>Todavía no hay proyectos. Nacen al aprobar una cotización, al resolver una inspección o creándolos aquí.</p>}
         {seccion("En marcha", abiertos, tarjetaProyecto, ac)}
         {seccion("Cerrados y cancelados", [...cerrados].sort((a, b) => (b.fechaCierre || "").localeCompare(a.fechaCierre || "")), tarjetaProyecto)}

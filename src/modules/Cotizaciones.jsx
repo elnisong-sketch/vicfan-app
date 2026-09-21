@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  ACENTOS, ESTADO_COLOR, BORDER, BG_INPUT, TEXT_SUB, GREEN, RED,
+  ACENTOS, ESTADO_COLOR, BORDER, BG_INPUT, BG_CARD, TEXT_MAIN, TEXT_SUB, GREEN, RED,
   hoy, usd, uid,
   Badge, Btn, Card, Inp, Sel, Modal, Etiqueta, estiloInput,
 } from "../ui.jsx";
@@ -260,6 +260,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
   const [form, setForm] = useState(null);
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [generando, setGenerando] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
 
   // El PDF se construye aquí y se entrega como archivo. La impresión del
   // navegador no servía: dentro de una PWA instalada en Android, Chrome no
@@ -332,7 +333,18 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
         <Btn onClick={abrirNueva} color={ac} small>+ Nueva</Btn>
       </div>
 
-      {cotizaciones.map(q => (
+      {cotizaciones.length > 0 && (
+        <div style={{ position: "relative", marginBottom: 14 }}>
+          <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por cliente, Nº o artículo…"
+            style={{ width: "100%", boxSizing: "border-box", padding: "11px 36px 11px 12px", borderRadius: 12, border: `1px solid ${BORDER}`, background: BG_CARD, color: TEXT_MAIN, fontSize: 14, fontFamily: "inherit" }} />
+          {busqueda
+            ? <button onClick={() => setBusqueda("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: TEXT_SUB, fontSize: 15, cursor: "pointer", padding: 4 }}>✕</button>
+            : <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: TEXT_SUB, fontSize: 14, pointerEvents: "none" }}>🔍</span>}
+        </div>
+      )}
+      {cotizaciones
+        .filter(q => { const nrm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); const s = nrm(busqueda); return !s || nrm(nc(q.clienteId)).includes(s) || nrm(numeroVisible(q)).includes(s) || (q.items || []).some(i => nrm(i.nombre).includes(s)); })
+        .map(q => (
         <Card key={q.id}>
           <div onClick={() => setDetalle(q)} style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div>
