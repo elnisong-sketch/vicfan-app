@@ -149,7 +149,7 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura, autor }) {
           <Chips value={tipo} onChange={setTipo} color={ac} opciones={TIPOS_FOTO.map(t => ({ value: t.id, label: t.label }))} />
           <label style={{ display: "block", background: BG_INPUT, border: `1.5px dashed ${BORDER}`, borderRadius: 12, padding: "16px 12px", textAlign: "center", cursor: "pointer", marginBottom: 10, color: TEXT_SUB, fontSize: 14, fontWeight: 600 }}>
             {cargando ? "Procesando…" : "📸 Tomar o elegir foto"}
-            <input type="file" accept="image/*" capture="environment" multiple onChange={agregar} disabled={cargando} style={{ display: "none" }} />
+            <input type="file" accept="image/*" multiple onChange={agregar} disabled={cargando} style={{ display: "none" }} />
           </label>
         </>
       )}
