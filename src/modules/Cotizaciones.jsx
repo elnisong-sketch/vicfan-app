@@ -38,7 +38,6 @@ const GARANTIAS = [
 ];
 
 const NOTAS_FRECUENTES = [
-  "El trabajo a realizar es un proyecto llave en mano.",
   "No incluye obra civil.",
   "Precios sujetos a disponibilidad de inventario.",
 ];
@@ -87,7 +86,7 @@ export const cotizacionVacia = cotizaciones => ({
   estado: "Pendiente",
   condicionesPago: CONDICIONES_PAGO[0],
   garantia: GARANTIAS[0],
-  notas: [NOTAS_FRECUENTES[0]],
+  notas: [],
   items: [],
   total: 0,
 });

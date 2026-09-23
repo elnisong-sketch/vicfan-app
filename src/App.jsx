@@ -134,12 +134,12 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
     .filter(v => !q || norm(nc(v.clienteId)).includes(q) || norm(v.origen).includes(q) || (v.items || []).some(i => norm(i.nombre).includes(q)))
     .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
 
-  const abrir = () => { setF({ clienteId: "", items: [], formaPago: "Efectivo" }); setModal(true); };
-  const editar = v => { setF({ id: v.id, clienteId: v.clienteId, items: (v.items || []).map(i => ({ ...i })), formaPago: v.formaPago }); setModal(true); };
+  const abrir = () => { setF({ clienteId: "", items: [], formaPago: "Efectivo", nota: "" }); setModal(true); };
+  const editar = v => { setF({ id: v.id, clienteId: v.clienteId, items: (v.items || []).map(i => ({ ...i })), formaPago: v.formaPago, nota: v.nota || "" }); setModal(true); };
   const guardar = () => {
     if (!f.clienteId || f.items.length === 0) return;
-    if (f.id) onEditarVenta(f.id, { clienteId: f.clienteId, items: f.items, formaPago: f.formaPago });
-    else onNuevaVenta({ clienteId: f.clienteId, items: f.items, formaPago: f.formaPago });
+    if (f.id) onEditarVenta(f.id, { clienteId: f.clienteId, items: f.items, formaPago: f.formaPago, nota: f.nota });
+    else onNuevaVenta({ clienteId: f.clienteId, items: f.items, formaPago: f.formaPago, nota: f.nota });
     setModal(false);
   };
 
@@ -187,6 +187,7 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
               <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15 }}>{nc(v.clienteId)}</p>
               <p style={{ margin: "0 0 2px", fontSize: 13, color: TEXT_SUB }}>📅 {v.fecha} · 💳 {v.formaPago}</p>
               <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB }}>{v.origen}{v.items?.length ? ` · ${v.items.length} ítem(s)` : ""}</p>
+              {v.nota && <p style={{ margin: "4px 0 0", fontSize: 12.5, color: TEXT_SUB, fontStyle: "italic" }}>📝 {v.nota}</p>}
             </div>
             <div style={{ textAlign: "right" }}>
               <p style={{ margin: "0 0 6px", fontWeight: 800, fontSize: 16, color: ac }}>{usd(v.total)}</p>
@@ -216,6 +217,9 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
           <LineasItems items={f.items} onCambio={items => setF(x => ({ ...x, items }))} inventario={inventario} repuestos={repuestos} />
           <Sel label="Forma de pago" value={f.formaPago} onChange={v => setF(x => ({ ...x, formaPago: v }))}
             options={["Efectivo", "Transferencia", "Pago móvil", "Zelle", "Divisas", "Por definir"].map(o => ({ value: o, label: o }))} />
+          <Etiqueta>Nota (opcional)</Etiqueta>
+          <textarea value={f.nota || ""} onChange={e => setF(x => ({ ...x, nota: e.target.value }))} rows={2} placeholder="La rellena el dueño…"
+            style={{ ...estiloInput, resize: "vertical", marginBottom: 14 }} />
           <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 16, margin: "4px 2px 14px" }}>
             <span>TOTAL</span><span style={{ color: ac }}>{usd(totalF())}</span>
           </div>
@@ -673,7 +677,7 @@ export default function App() {
     }))]);
   };
 
-  const registrarVenta = ({ clienteId, items = [], total, formaPago = "Por definir", origen = "Directa", proyectoId = null, cotizacionId = null, estado = "Pendiente cobro" }) => {
+  const registrarVenta = ({ clienteId, items = [], total, formaPago = "Por definir", origen = "Directa", proyectoId = null, cotizacionId = null, estado = "Pendiente cobro", nota = "" }) => {
     const consumo = materialDeItems(items);
     if (consumo.length) {
       const r = moverStock(inventario, repuestos, consumo, -1);
@@ -682,7 +686,7 @@ export default function App() {
       if (r.faltantes.length) setTimeout(() => alert(avisoFaltantes(r.faltantes)), 50);
     }
     const suma = total ?? items.reduce((sum, i) => sum + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
-    const venta = { id: uid(), fecha: hoy(), clienteId, items, total: suma, formaPago, estado, origen, proyectoId, cotizacionId, consumoStock: consumo, creadaEn: new Date().toISOString() };
+    const venta = { id: uid(), fecha: hoy(), clienteId, items, total: suma, formaPago, estado, origen, proyectoId, cotizacionId, nota, consumoStock: consumo, creadaEn: new Date().toISOString() };
     setVentas(p => [...p, venta]);
     anotarMov(consumo, "salida", origen);
     return venta;
@@ -716,7 +720,7 @@ export default function App() {
     setRepuestos(fwd.repuestos);
     if (fwd.faltantes.length) setTimeout(() => alert(avisoFaltantes(fwd.faltantes)), 50);
     const total = cambios.items.reduce((s, i) => s + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
-    setVentas(p => p.map(v => v.id === ventaId ? { ...v, clienteId: cambios.clienteId, items: cambios.items, formaPago: cambios.formaPago, total, consumoStock: nuevoConsumo } : v));
+    setVentas(p => p.map(v => v.id === ventaId ? { ...v, clienteId: cambios.clienteId, items: cambios.items, formaPago: cambios.formaPago, nota: cambios.nota ?? v.nota ?? "", total, consumoStock: nuevoConsumo } : v));
     // Anotar en el historial la diferencia de material por la edición.
     const vMap = new Map((vieja.consumoStock || []).map(m => [m.clase + ":" + m.id, m]));
     const nMap = new Map(nuevoConsumo.map(m => [m.clase + ":" + m.id, m]));
@@ -759,7 +763,7 @@ export default function App() {
       items = [{ id: uid(), modeloId: planta?.id, nombre: datos.equipo, cantidad: 1, precio, subtotal: precio }];
     }
     const total = items.reduce((s, i) => s + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
-    registrarVenta({ clienteId: datos.clienteId, items, total, origen: `Proyecto: ${proyecto.nombre}`, proyectoId: proyecto.id });
+    registrarVenta({ clienteId: datos.clienteId, items, total, origen: `Proyecto: ${proyecto.nombre}`, proyectoId: proyecto.id, nota: datos.nota || "" });
     return proyecto;
   };
 

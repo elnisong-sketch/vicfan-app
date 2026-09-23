@@ -70,6 +70,7 @@ function ModalProyecto({ clientes, onCrearCliente, inventario, repuestos, onGuar
       <Inp label="Nombre del proyecto" value={f.nombre} onChange={v => set("nombre", v)} placeholder="Instalación Generac 26kW" />
       <Inp label="Dirección" value={f.direccion} onChange={v => set("direccion", v)} />
       <Area label="Alcance del trabajo" value={f.descripcion} onChange={v => set("descripcion", v)} placeholder="Qué incluye, instrucciones para el técnico…" />
+      <Area label="Nota de la venta (opcional)" value={f.nota || ""} onChange={v => set("nota", v)} placeholder="La rellena el dueño…" />
 
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 10 }}>
         <Inp label="Inicio de la instalación" type="date" value={f.fechaInicio} onChange={v => set("fechaInicio", v)} />
