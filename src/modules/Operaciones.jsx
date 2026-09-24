@@ -4,7 +4,7 @@ import {
   hoy, fechaCorta, fechaLarga, sumarDias, esPasado,
   Badge, Btn, Card, Inp, Area, Sel, Modal, Chips, Etiqueta, estiloInput,
 } from "../ui.jsx";
-import { registrar, estaAbierta, esIncidencia, claseInspeccion, ETIQUETA_ORIGEN, RESULTADO_COLOR } from "./Tareas.jsx";
+import { tareaVacia, registrar, estaAbierta, esIncidencia, claseInspeccion, ETIQUETA_ORIGEN, RESULTADO_COLOR } from "./Tareas.jsx";
 import { SelectorCliente, ModalInspeccion } from "./Inspeccion.jsx";
 import { AgregarLinea, LineasItems } from "./Cotizaciones.jsx";
 import { proyectoVacio, tareaDeProyecto, MESES_MANTENIMIENTO, MESES_GARANTIA, diasHasta, garantiaDeProyecto } from "../proyectos.js";
@@ -255,6 +255,35 @@ function ModalMaterial({ tarea, inventario, repuestos, nombreCliente, onGuardar,
   );
 }
 
+// ── Alta y edición de un mantenimiento (lo lleva la oficina) ────────────────────
+function ModalMantenimiento({ tarea, clientes, inventario, onCrearCliente, onGuardar, onCerrar }) {
+  const editando = !!tarea;
+  const [f, setF] = useState(() => tarea ? { ...tarea } : { ...tareaVacia(""), tipo: "Mantenimiento", hora: "09:00" });
+  const set = (k, v) => setF(p => ({ ...p, [k]: v }));
+  const elegirCliente = (id, c) => setF(p => ({ ...p, clienteId: id, direccion: p.direccion || c?.direccion || "" }));
+  return (
+    <Modal onClose={onCerrar}>
+      <h3 style={{ margin: "0 0 16px", color: ac }}>🔩 {editando ? "Editar mantenimiento" : "Nuevo mantenimiento"}</h3>
+      <SelectorCliente clientes={clientes} valor={f.clienteId} onCambio={elegirCliente} onCrear={onCrearCliente} />
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
+        <Inp label="Fecha" type="date" value={f.fecha} onChange={v => set("fecha", v)} />
+        <Inp label="Hora" type="time" value={f.hora} onChange={v => set("hora", v)} />
+      </div>
+      <SelectorEquipo valor={f.modelo} inventario={inventario} onEscribir={v => set("modelo", v)} onElegir={v => set("modelo", v)} />
+      <Inp label="Dirección" value={f.direccion} onChange={v => set("direccion", v)} />
+      <Area label="Detalle del mantenimiento" value={f.descripcion} onChange={v => set("descripcion", v)} placeholder="Qué hay que revisar…" />
+      <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 600, marginBottom: 16, cursor: "pointer" }}>
+        <input type="checkbox" checked={f.publicada} onChange={e => set("publicada", e.target.checked)} style={{ width: 18, height: 18 }} />
+        Publicarlo ya a los técnicos
+      </label>
+      <div style={{ display: "flex", gap: 10 }}>
+        <Btn onClick={() => onGuardar(f)} color={ac} full disabled={!f.clienteId}>{editando ? "Guardar cambios" : "Crear mantenimiento"}</Btn>
+        <Btn onClick={onCerrar} color={TEXT_SUB} outline full>Cancelar</Btn>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Módulo ─────────────────────────────────────────────────────────────────────
 export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, crearProyecto, onCancelarProyecto, onEliminarProyecto, onGuardarMaterialMantenimiento, onResolverInspeccion }) {
   const garantiaDe = id => garantias.find(g => g.proyectoId === id);
@@ -263,6 +292,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
   const [modal, setModal] = useState(null);          // "proyecto" | "Visita comercial" | "Incidencia del cliente"
   const [detalle, setDetalle] = useState(null);
   const [matMant, setMatMant] = useState(null);
+  const [mantModal, setMantModal] = useState(null);   // false=cerrado, {}=nuevo, tarea=editar
 
   const nombreCliente = id => clientes.find(c => c.id === id)?.nombre || "— sin cliente —";
   const crearCliente = c => setClientes(p => [...p, c]);
@@ -400,7 +430,9 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       </>}
 
       {vista === "mantenimientos" && <>
-        {mants.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>No hay mantenimientos programados. Se programan solos al cerrarse cada proyecto.</p>}
+        <Btn onClick={() => setMantModal({})} color={ac} small>+ Nuevo mantenimiento</Btn>
+        <div style={{ height: 14 }} />
+        {mants.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>No hay mantenimientos programados. Se programan solos al cerrar un proyecto, o créalos aquí con «+ Nuevo mantenimiento».</p>}
         {[["⚠️ Vencidos", vencidos, RED], ["Próximos 60 días", proximos, ac], ["Más adelante", masAdelante, TEXT_SUB]].map(([titulo, lista, color]) =>
           seccion(titulo, lista, t => (
             <Card key={t.id} style={{ padding: 14, borderLeft: `4px solid ${color}` }}>
@@ -414,6 +446,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
               {t.materiales?.length > 0 && <p style={{ margin: "8px 0 0", fontSize: 12.5, color: TEXT_SUB }}>🔧 Material: {t.materiales.reduce((s, m) => s + (Number(m.cantidad) || 0), 0)} u. · {t.materiales.length} artículo(s)</p>}
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <Btn onClick={() => setMatMant(t)} color={ac} outline small>🔧 Material</Btn>
+                <Btn onClick={() => setMantModal(t)} color={ac} outline small>✏️ Editar</Btn>
                 {t.publicada === false && (
                   <Btn onClick={() => actualizarTarea(t.id, x => registrar({ ...x, publicada: true }, "Publicada a los técnicos", "Oficina"))} color={ACENTOS.tareas} small>📢 Publicar</Btn>
                 )}
@@ -425,6 +458,17 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       {matMant && (
         <ModalMaterial tarea={tareas.find(t => t.id === matMant.id) || matMant} inventario={inventario} repuestos={repuestos} nombreCliente={nombreCliente}
           onGuardar={mats => { onGuardarMaterialMantenimiento(matMant, mats); setMatMant(null); }} onCerrar={() => setMatMant(null)} />
+      )}
+
+      {mantModal && (
+        <ModalMantenimiento tarea={mantModal.id ? mantModal : null} clientes={clientes} inventario={inventario} onCrearCliente={crearCliente}
+          onGuardar={f => {
+            setTareas(p => p.some(t => t.id === f.id)
+              ? p.map(t => t.id === f.id ? registrar(f, "Mantenimiento editado", "Oficina") : t)
+              : [...p, registrar(f, "Mantenimiento creado", "Oficina")]);
+            setMantModal(null);
+          }}
+          onCerrar={() => setMantModal(null)} />
       )}
 
       {modal === "proyecto" && (
