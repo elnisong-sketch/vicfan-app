@@ -113,26 +113,31 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura, autor }) {
 
   const agregar = async e => {
     const archivos = Array.from(e.target.files || []);
+    e.target.value = "";
     if (!archivos.length) return;
     setCargando(true);
-    try {
-      const nuevas = [];
-      const cuando = new Date().toISOString();
-      for (const file of archivos) {
+    // Cada foto va por su cuenta: si una falla, las demas si se guardan.
+    const nuevas = [];
+    const cuando = new Date().toISOString();
+    let sinEspacio = false, otroFallo = 0;
+    for (const file of archivos) {
+      try {
         const id = uid();
         await guardarFoto({ id, tareaId, tipo, autor, file });
         nuevas.push({ id, tipo, autor, cuando });
+      } catch (err) {
+        if (err?.motivo === "espacio") sinEspacio = true; else otroFallo++;
       }
+    }
+    if (nuevas.length) {
       const etiqueta = TIPOS_FOTO.find(t => t.id === tipo)?.label || tipo;
       onCambio([...fotos, ...nuevas], {
         accion: `${nuevas.length} foto${nuevas.length === 1 ? "" : "s"} añadida${nuevas.length === 1 ? "" : "s"} (${etiqueta})`,
       });
-    } catch {
-      alert("No se pudo guardar la foto. Revisa el espacio disponible en el teléfono.");
-    } finally {
-      setCargando(false);
-      e.target.value = "";
     }
+    setCargando(false);
+    if (sinEspacio) alert("El teléfono se quedó sin espacio para guardar la foto. Libera algo de espacio, o conéctate a internet y se subirá directamente.");
+    else if (otroFallo) alert(`No se pudo procesar ${otroFallo} foto${otroFallo === 1 ? "" : "s"} (puede ser el formato). Prueba a tomarla de nuevo o elegir otra.`);
   };
 
   const quitar = async id => {

@@ -61,27 +61,51 @@ const guardarLocal = registro => conAlmacen("readwrite", store => { store.put(re
  * A 1280 px y calidad 0.7 una foto queda en 100-200 KB y el número de serie
  * de una placa se sigue leyendo sin problema.
  */
-export async function comprimirImagen(file, maxLado = 1280, calidad = 0.7, tipo = "image/jpeg") {
-  const bitmap = await createImageBitmap(file);
-  const escala = Math.min(1, maxLado / Math.max(bitmap.width, bitmap.height));
-  const ancho = Math.round(bitmap.width * escala);
-  const alto = Math.round(bitmap.height * escala);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = ancho;
-  canvas.height = alto;
-  const ctx = canvas.getContext("2d");
-
-  // El JPEG no admite transparencia: sin este relleno, lo transparente sale
-  // negro. Se rellena de blanco, que es el color del papel y de la pantalla.
-  if (tipo === "image/jpeg") {
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, ancho, alto);
+// Decodifica la imagen. Primero con createImageBitmap (rapido); si el formato
+// lo rechaza --pasa con algun HEIC del iPhone o ciertos WebP-- cae a un <img>,
+// que el navegador si sabe pintar. Asi no se pierde la foto por el formato.
+async function decodificar(file) {
+  try {
+    return await createImageBitmap(file);
+  } catch {
+    const url = URL.createObjectURL(file);
+    try {
+      return await new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => res(img);
+        img.onerror = () => rej(new Error("No se pudo leer la imagen"));
+        img.src = url;
+      });
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 15000);
+    }
   }
-  ctx.drawImage(bitmap, 0, 0, ancho, alto);
-  bitmap.close?.();
+}
 
-  return new Promise(resolve => canvas.toBlob(resolve, tipo, calidad));
+const aBlob = (canvas, tipo, calidad) => new Promise(resolve => canvas.toBlob(resolve, tipo, calidad));
+
+export async function comprimirImagen(file, maxLado = 1280, calidad = 0.7, tipo = "image/jpeg") {
+  const src = await decodificar(file);
+  const anchoReal = src.width || src.naturalWidth;
+  const altoReal = src.height || src.naturalHeight;
+
+  // Se intenta a 1280 px; si la memoria no da para el toBlob (devuelve null),
+  // se reintenta cada vez mas pequeno antes de rendirse.
+  for (const lado of [maxLado, 1024, 800, 640]) {
+    const escala = Math.min(1, lado / Math.max(anchoReal, altoReal));
+    const ancho = Math.max(1, Math.round(anchoReal * escala));
+    const alto = Math.max(1, Math.round(altoReal * escala));
+    const canvas = document.createElement("canvas");
+    canvas.width = ancho;
+    canvas.height = alto;
+    const ctx = canvas.getContext("2d");
+    if (tipo === "image/jpeg") { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, ancho, alto); }
+    ctx.drawImage(src, 0, 0, ancho, alto);
+    const blob = await aBlob(canvas, tipo, calidad);
+    if (blob) { src.close?.(); return blob; }
+  }
+  src.close?.();
+  return null;
 }
 
 const blobADataUrl = blob => new Promise((res, rej) => {
@@ -95,11 +119,36 @@ const dataUrlABlob = url => fetch(url).then(r => r.blob());
 
 // ── GUARDAR Y SUBIR ───────────────────────────────────────────────────────────
 
-/** Guarda la foto en el dispositivo e intenta subirla. Nunca falla por la red. */
+// Libera espacio borrando de la cache local las fotos que YA estan subidas a
+// la nube. No se pierden: se vuelven a bajar de Firestore si hacen falta.
+async function liberarEspacioLocal() {
+  return conAlmacen("readwrite", store => {
+    store.openCursor().onsuccess = e => {
+      const cursor = e.target.result;
+      if (cursor) { if (cursor.value.subida) store.delete(cursor.value.id); cursor.continue(); }
+    };
+    return {};
+  });
+}
+
+/** Guarda la foto en el dispositivo e intenta subirla. Tolera fallos de
+ *  formato, de memoria y de espacio, y nunca falla por la red. */
 export async function guardarFoto({ id, tareaId, tipo, autor, file }) {
   const blob = await comprimirImagen(file);
+  if (!blob) { const err = new Error("No se pudo procesar la imagen"); err.motivo = "formato"; throw err; }
   const registro = { id, tareaId, tipo, autor: autor || "—", blob, bytes: blob.size, creadaEn: new Date().toISOString(), subida: false };
-  await guardarLocal(registro);
+
+  try {
+    await guardarLocal(registro);
+  } catch {
+    await liberarEspacioLocal().catch(() => {});
+    try {
+      await guardarLocal(registro);
+    } catch {
+      try { await subirFoto(registro); return registro; }
+      catch { const err = new Error("Sin espacio y sin conexion"); err.motivo = "espacio"; throw err; }
+    }
+  }
   subirFoto(registro).catch(() => {});   // en segundo plano; si falla, queda en cola
   return registro;
 }
