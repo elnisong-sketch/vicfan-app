@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   ACENTOS, ESTADO_COLOR, BORDER, BG_INPUT, BG_CARD, TEXT_MAIN, TEXT_SUB, GREEN, RED,
   hoy, usd, uid,
-  Badge, Btn, Card, Inp, Sel, Modal, Etiqueta, estiloInput,
+  Badge, Btn, Card, Inp, Sel, Modal, Etiqueta, estiloInput, CampoDocumento, unirDocumento,
 } from "../ui.jsx";
 
 const ac = ACENTOS.cotizaciones;
@@ -148,19 +148,19 @@ function SelLibre({ label, value, onChange, opciones, placeholder }) {
 
 // ── ALTA DE CLIENTE SIN SALIR DE LA COTIZACIÓN ────────────────────────────────
 export function NuevoCliente({ onCrear, onCancelar }) {
-  const [f, setF] = useState({ nombre: "", documento: "", telefono: "", direccion: "", tipo: "Residencial" });
+  const [f, setF] = useState({ nombre: "", tipoDoc: "V", documento: "", telefono: "", direccion: "", tipo: "Residencial" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
 
   return (
     <div style={{ background: BG_INPUT, border: `1.5px solid ${ac}44`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
       <p style={{ margin: "0 0 12px", fontWeight: 800, fontSize: 14, color: ac }}>➕ Nuevo cliente</p>
       <Inp label="Nombre o razón social" value={f.nombre} onChange={v => set("nombre", v)} placeholder="Sr. Miguel Roncagliolo" />
-      <Inp label="C.I. / RIF" value={f.documento} onChange={v => set("documento", v)} placeholder="V-14.930.796" />
+      <CampoDocumento tipoDoc={f.tipoDoc} numeroDoc={f.documento} onTipo={v => set("tipoDoc", v)} onNumero={v => set("documento", v)} />
       <Inp label="Teléfono" value={f.telefono} onChange={v => set("telefono", v)} placeholder="0412-555-1234" />
       <Inp label="Dirección" value={f.direccion} onChange={v => set("direccion", v)} placeholder="Lechería, Av. R7…" />
       <Sel label="Tipo" value={f.tipo} onChange={v => set("tipo", v)} options={["Residencial", "Comercial", "Industrial"].map(t => ({ value: t, label: t }))} />
       <div style={{ display: "flex", gap: 8 }}>
-        <Btn onClick={() => f.nombre.trim() && onCrear({ id: uid(), email: "", notas: "", ...f })} color={ac} small full disabled={!f.nombre.trim()}>Crear y usar</Btn>
+        <Btn onClick={() => f.nombre.trim() && onCrear({ id: uid(), email: "", notas: "", ...f, documento: unirDocumento(f.tipoDoc, f.documento) })} color={ac} small full disabled={!f.nombre.trim()}>Crear y usar</Btn>
         <Btn onClick={onCancelar} color={TEXT_SUB} outline small full>Cancelar</Btn>
       </div>
     </div>

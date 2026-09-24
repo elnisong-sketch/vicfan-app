@@ -99,6 +99,44 @@ export function Card({ children, style, onClick }) {
 const baseInput = { width: "100%", background: BG_INPUT, border: `1.5px solid ${BORDER}`, borderRadius: 10, color: TEXT_MAIN, padding: "12px 14px", fontSize: 15, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 export const estiloInput = baseInput;
 
+// Prefijos de documento del SENIAT (Venezuela): naturales V/E/P, jurídicas J/G.
+export const TIPOS_DOCUMENTO = [
+  { p: "V", ayuda: "Venezolano" },
+  { p: "E", ayuda: "Extranjero" },
+  { p: "J", ayuda: "Jurídico (empresa)" },
+  { p: "G", ayuda: "Gobierno" },
+  { p: "P", ayuda: "Pasaporte" },
+];
+
+/** Separa "J-29756909-0" en { tipoDoc:"J", numeroDoc:"29756909-0" }. */
+export function partesDocumento(doc) {
+  const m = /^\s*([VEJGPC])\s*[-\s]?\s*(.*)$/i.exec(doc || "");
+  return m ? { tipoDoc: m[1].toUpperCase(), numeroDoc: m[2].trim() } : { tipoDoc: "V", numeroDoc: (doc || "").trim() };
+}
+/** Une el tipo y el número en el documento que se guarda ("J-29756909-0"). */
+export const unirDocumento = (tipoDoc, numeroDoc) => (numeroDoc || "").trim() ? `${tipoDoc || "V"}-${(numeroDoc || "").trim()}` : "";
+
+/** Selector de tipo de documento (V/E/J/G/P) + número. */
+export function CampoDocumento({ tipoDoc = "V", numeroDoc = "", onTipo, onNumero, label = "Documento (C.I. / RIF)" }) {
+  const acc = ACENTOS.clientes;
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <Etiqueta>{label}</Etiqueta>
+      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+        {TIPOS_DOCUMENTO.map(t => {
+          const activo = tipoDoc === t.p;
+          return (
+            <button key={t.p} type="button" onClick={() => onTipo(t.p)} title={t.ayuda}
+              style={{ flex: 1, padding: "9px 4px", borderRadius: 10, border: `2px solid ${activo ? acc : BORDER}`, background: activo ? acc + "22" : BG_CARD, color: activo ? acc : TEXT_SUB, fontWeight: 800, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}>{t.p}</button>
+          );
+        })}
+      </div>
+      <input value={numeroDoc} onChange={e => onNumero(e.target.value)} placeholder="Número (ej. 14.930.796)" style={baseInput} />
+      <p style={{ margin: "5px 2px 0", fontSize: 11.5, color: TEXT_SUB }}>{TIPOS_DOCUMENTO.find(t => t.p === tipoDoc)?.ayuda}</p>
+    </div>
+  );
+}
+
 export function Etiqueta({ children }) {
   return <label style={{ fontSize: 12, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 6 }}>{children}</label>;
 }

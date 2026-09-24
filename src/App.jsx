@@ -3,7 +3,7 @@ import { useColeccion } from "./datos.js";
 import {
   NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB,
   ACENTOS, ESTADO_COLOR, hoy, usd, uid, sumarMeses, fechaCorta,
-  Badge, Btn, Card, Inp, Sel, Modal, CampoImagen, estiloInput, Etiqueta,
+  Badge, Btn, Card, Inp, Sel, Modal, CampoImagen, estiloInput, Etiqueta, CampoDocumento, partesDocumento, unirDocumento,
 } from "./ui.jsx";
 import { prepararImagen, prepararLogo } from "./imagenes.js";
 import ModuloTareas, { registrar } from "./modules/Tareas.jsx";
@@ -35,13 +35,13 @@ function ModuloClientes({ clientes, setClientes }) {
   const [form, setForm] = useState({});
   const [busqueda, setBusqueda] = useState("");
   const ac = ACENTOS.clientes;
-  const guardar = () => { if (!form.nombre?.trim()) return; setClientes(p => p.find(x => x.id === form.id) ? p.map(x => x.id === form.id ? form : x) : [...p, form]); setModal(false); };
+  const guardar = () => { if (!form.nombre?.trim()) return; const limpio = { ...form, documento: unirDocumento(form.tipoDoc, form.documento) }; setClientes(p => p.find(x => x.id === limpio.id) ? p.map(x => x.id === limpio.id ? limpio : x) : [...p, limpio]); setModal(false); };
   const filtrados = clientes.filter(c => c.nombre.toLowerCase().includes(busqueda.toLowerCase()) || c.telefono.includes(busqueda));
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>👥 Clientes</h2>
-        <Btn onClick={() => { setForm({ id: uid(), nombre: "", documento: "", telefono: "", email: "", direccion: "", tipo: "Residencial", notas: "" }); setModal(true); }} color={ac} small>+ Nuevo</Btn>
+        <Btn onClick={() => { setForm({ id: uid(), nombre: "", tipoDoc: "V", documento: "", telefono: "", email: "", direccion: "", tipo: "Residencial", notas: "" }); setModal(true); }} color={ac} small>+ Nuevo</Btn>
       </div>
       <Inp placeholder="Buscar..." value={busqueda} onChange={setBusqueda} />
       {filtrados.map(c => (
@@ -55,7 +55,7 @@ function ModuloClientes({ clientes, setClientes }) {
               <Badge text={c.tipo} color={ac} />
             </div>
             <div style={{ display: "flex", gap: 6, marginLeft: 8 }}>
-              <Btn onClick={() => { setForm({ ...c }); setModal(true); }} color={ac} outline small>✏️</Btn>
+              <Btn onClick={() => { const d = partesDocumento(c.documento); setForm({ ...c, tipoDoc: d.tipoDoc, documento: d.numeroDoc }); setModal(true); }} color={ac} outline small>✏️</Btn>
               <Btn onClick={() => setClientes(p => p.filter(x => x.id !== c.id))} color={RED} outline small>🗑️</Btn>
             </div>
           </div>
@@ -65,7 +65,7 @@ function ModuloClientes({ clientes, setClientes }) {
         <Modal onClose={() => setModal(false)}>
           <h3 style={{ margin: "0 0 20px", color: ac }}>Cliente</h3>
           <Inp label="Nombre o razón social" value={form.nombre || ""} onChange={v => setForm(p => ({ ...p, nombre: v }))} />
-          <Inp label="C.I. / RIF" value={form.documento || ""} onChange={v => setForm(p => ({ ...p, documento: v }))} placeholder="V-14.930.796" />
+          <CampoDocumento tipoDoc={form.tipoDoc || "V"} numeroDoc={form.documento || ""} onTipo={v => setForm(p => ({ ...p, tipoDoc: v }))} onNumero={v => setForm(p => ({ ...p, documento: v }))} />
           <Inp label="Teléfono" value={form.telefono || ""} onChange={v => setForm(p => ({ ...p, telefono: v }))} placeholder="0412-555-1234" />
           <Inp label="Email" value={form.email || ""} onChange={v => setForm(p => ({ ...p, email: v }))} type="email" />
           <Inp label="Dirección" value={form.direccion || ""} onChange={v => setForm(p => ({ ...p, direccion: v }))} />
