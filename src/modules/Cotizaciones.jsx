@@ -84,6 +84,7 @@ export const cotizacionVacia = cotizaciones => ({
   clienteId: "",
   fecha: hoy(),
   estado: "Pendiente",
+  tipoTrabajo: "Proyecto",
   condicionesPago: CONDICIONES_PAGO[0],
   garantia: GARANTIAS[0],
   notas: [],
@@ -380,7 +381,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
             <div>
               <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15 }}>{nc(q.clienteId)}</p>
               <p style={{ margin: 0, fontSize: 13, color: TEXT_SUB }}>
-                Nº {numeroVisible(q)} · 📅 {q.fecha} · {q.items.length} ítem(s)
+                Nº {numeroVisible(q)} · 📅 {q.fecha} · {q.items.length} ítem(s){q.tipoTrabajo === "Mantenimiento" ? " · 🔩 Mantenimiento" : ""}
               </p>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -505,6 +506,17 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
               )}
             </>
           )}
+
+          <Etiqueta>Tipo de trabajo</Etiqueta>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {[["Proyecto", "🏗️ Proyecto"], ["Mantenimiento", "🔩 Mantenimiento"]].map(([v, label]) => {
+              const activo = (form.tipoTrabajo || "Proyecto") === v;
+              return (
+                <button key={v} type="button" onClick={() => set("tipoTrabajo", v)}
+                  style={{ flex: 1, padding: "11px 6px", borderRadius: 10, border: `2px solid ${activo ? ac : BORDER}`, background: activo ? ac + "22" : BG_CARD, color: activo ? ac : TEXT_SUB, fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
+              );
+            })}
+          </div>
 
           <SelLibre label="Condiciones de pago" value={form.condicionesPago} onChange={v => set("condicionesPago", v)}
             opciones={CONDICIONES_PAGO} placeholder="Escribe las condiciones" />

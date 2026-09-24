@@ -6,7 +6,7 @@ import {
   Badge, Btn, Card, Inp, Sel, Modal, CampoImagen, estiloInput, Etiqueta, CampoDocumento, partesDocumento, unirDocumento,
 } from "./ui.jsx";
 import { prepararImagen, prepararLogo } from "./imagenes.js";
-import ModuloTareas, { registrar } from "./modules/Tareas.jsx";
+import ModuloTareas, { registrar, tareaVacia } from "./modules/Tareas.jsx";
 import ModuloOperaciones from "./modules/Operaciones.jsx";
 import { proyectoVacio, tareaDeProyecto, planAutomatico, diasHasta, garantiaDeVenta } from "./proyectos.js";
 import { materialDeItems, moverStock, avisoFaltantes } from "./inventario.js";
@@ -772,6 +772,24 @@ export default function App() {
   const aprobarCotizacion = q => {
     setCotizaciones(p => p.map(x => x.id === q.id ? { ...x, estado: "Aprobada" } : x));
     const alcance = alcanceDeCotizacion(q);
+    // Un mantenimiento cotizado no abre proyecto: crea directamente su tarea de
+    // Mantenimiento (aparece en Tareas y en el módulo Mantenimientos) y su venta.
+    if (q.tipoTrabajo === "Mantenimiento") {
+      const cliente = clientes.find(c => c.id === q.clienteId);
+      const tarea = registrar({
+        ...tareaVacia(q.clienteId),
+        tipo: "Mantenimiento",
+        modelo: alcance.modelo,
+        direccion: cliente?.direccion || "",
+        descripcion: alcance.descripcion,
+        costo: alcance.costo,
+        cotizacionId: q.id,
+      }, `Creada al aprobar la cotización Nº ${q.numero}`, "Oficina");
+      setTareas(p => [...p, tarea]);
+      registrarVenta({ clienteId: q.clienteId, items: q.items, total: q.total, origen: `Cotización Nº ${q.numero} (mantenimiento)`, cotizacionId: q.id });
+      setTab("tareas");
+      return;
+    }
     const proyecto = crearProyecto({
       nombre: `Instalación ${alcance.modelo || "cotización " + q.numero}`,
       clienteId: q.clienteId,
