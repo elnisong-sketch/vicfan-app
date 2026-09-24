@@ -209,6 +209,12 @@ export async function contarPendientes(ids = []) {
   return ids.filter(id => enCola.has(id)).length;
 }
 
+/** Total de fotos que este dispositivo aun no ha subido (de todas las tareas). */
+export async function contarTodasPendientes() {
+  const cola = await pendientesDeSubir().catch(() => []);
+  return cola.length;
+}
+
 export async function pendientesDeSubir() {
   return conAlmacen("readonly", store => {
     const salida = { valor: [] };

@@ -16,6 +16,7 @@ import PantallaLogin from "./sesion.jsx";
 import { useSesion, salir as cerrarSesion } from "./auth.js";
 import Usuarios from "./modules/Usuarios.jsx";
 import { useNuevaVersion } from "./version.js";
+import { subirPendientes, contarTodasPendientes } from "./fotos.js";
 import AvisoInstalar from "./instalar.jsx";
 
 const TABS = [
@@ -30,6 +31,40 @@ const TABS = [
 ];
 
 // ── CLIENTES ──────────────────────────────────────────────────────────────────
+// Aviso global de fotos que este movil aun no ha subido a la nube. Se ve en
+// la cabecera, para tecnico y oficina, con boton para subirlas al momento.
+function AvisoPendientes() {
+  const [n, setN] = useState(0);
+  const [subiendo, setSubiendo] = useState(false);
+  const revisar = () => contarTodasPendientes().then(setN).catch(() => {});
+  const subir = async () => {
+    setSubiendo(true);
+    await subirPendientes().catch(() => {});
+    await revisar();
+    setSubiendo(false);
+  };
+  useEffect(() => {
+    revisar();
+    const t = setInterval(revisar, 5000);
+    const alVolver = () => subir();
+    window.addEventListener("online", alVolver);
+    return () => { clearInterval(t); window.removeEventListener("online", alVolver); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (n === 0 && !subiendo) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, background: ORANGE, color: "#fff", padding: "9px 16px" }}>
+      <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>
+        {subiendo ? "↑ Subiendo fotos…" : `📤 ${n} foto${n === 1 ? "" : "s"} pendiente${n === 1 ? "" : "s"} de subir`}
+      </span>
+      <button onClick={subir} disabled={subiendo}
+        style={{ background: "#ffffff22", border: "1px solid #ffffff66", borderRadius: 8, color: "#fff", padding: "6px 12px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+        {subiendo ? "…" : "Subir ahora"}
+      </button>
+    </div>
+  );
+}
+
 function ModuloClientes({ clientes, setClientes }) {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({});
@@ -1025,6 +1060,7 @@ export default function App() {
         </div>
       </div>
     </div>
+    <AvisoPendientes />
     </div>
   );
 
