@@ -311,7 +311,7 @@ function ModalCierre({ tarea, tecnicos, sesion, onFotos, onConfirmar, onCancelar
       tecnicoId: quien,
       // El nombre se copia a propósito: si mañana borras al técnico de la
       // lista, el registro de quién cerró la tarea tiene que sobrevivir.
-      tecnicoNombre: tecnico?.nombre || "—",
+      tecnicoNombre: quien === "oficina" ? (sesion?.nombre || "Oficina") : (tecnico?.nombre || "—"),
       cerradaEn: new Date().toISOString(),
       trabajoRealizado: trabajo.trim(),
       costoFinal: Number(costoFinal) || 0,
@@ -331,7 +331,8 @@ function ModalCierre({ tarea, tecnicos, sesion, onFotos, onConfirmar, onCancelar
           </div>
         </div>
       ) : (
-        <Sel label="¿Quién realizó el trabajo?" value={quien} onChange={setQuien} options={tecnicos.map(t => ({ value: t.id, label: t.nombre }))} />
+        <Sel label="¿Quién realizó el trabajo?" value={quien} onChange={setQuien}
+          options={[...tecnicos.map(t => ({ value: t.id, label: `👷 ${t.nombre}` })), { value: "oficina", label: "🏢 Oficina" }]} />
       )}
       <Area label="Trabajo realizado" value={trabajo} onChange={setTrabajo} filas={4} placeholder="Describe qué se hizo, qué se encontró, qué quedó pendiente…" />
 
