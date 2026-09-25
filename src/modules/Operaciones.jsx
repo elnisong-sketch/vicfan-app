@@ -256,9 +256,9 @@ function ModalMaterial({ tarea, inventario, repuestos, nombreCliente, onGuardar,
 }
 
 // ── Alta y edición de un mantenimiento (lo lleva la oficina) ────────────────────
-function ModalMantenimiento({ tarea, clientes, inventario, onCrearCliente, onGuardar, onCerrar }) {
+function ModalMantenimiento({ tarea, clientes, inventario, repuestos, onCrearCliente, onGuardar, onCerrar }) {
   const editando = !!tarea;
-  const [f, setF] = useState(() => tarea ? { ...tarea } : { ...tareaVacia(""), tipo: "Mantenimiento", hora: "09:00" });
+  const [f, setF] = useState(() => tarea ? { ...tarea } : { ...tareaVacia(""), tipo: "Mantenimiento", hora: "09:00", items: [], notaVenta: "" });
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const elegirCliente = (id, c) => setF(p => ({ ...p, clienteId: id, direccion: p.direccion || c?.direccion || "" }));
   return (
@@ -272,6 +272,15 @@ function ModalMantenimiento({ tarea, clientes, inventario, onCrearCliente, onGua
       <SelectorEquipo valor={f.modelo} inventario={inventario} onEscribir={v => set("modelo", v)} onElegir={v => set("modelo", v)} />
       <Inp label="Dirección" value={f.direccion} onChange={v => set("direccion", v)} />
       <Area label="Detalle del mantenimiento" value={f.descripcion} onChange={v => set("descripcion", v)} placeholder="Qué hay que revisar…" />
+
+      {/* Solo al crearlo: los artículos y servicios que se cobran generan su
+          venta y descuentan el inventario. Igual que un proyecto directo. */}
+      {!editando && <>
+        <Etiqueta>Artículos y servicios a cobrar</Etiqueta>
+        <LineasItems items={f.items || []} onCambio={items => set("items", items)} inventario={inventario} repuestos={repuestos} />
+        <Area label="Nota de la venta (opcional)" value={f.notaVenta || ""} onChange={v => set("notaVenta", v)} placeholder="La rellena el dueño…" />
+      </>}
+
       <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, fontWeight: 600, marginBottom: 16, cursor: "pointer" }}>
         <input type="checkbox" checked={f.publicada} onChange={e => set("publicada", e.target.checked)} style={{ width: 18, height: 18 }} />
         Publicarlo ya a los técnicos
@@ -285,7 +294,7 @@ function ModalMantenimiento({ tarea, clientes, inventario, onCrearCliente, onGua
 }
 
 // ── Módulo ─────────────────────────────────────────────────────────────────────
-export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, crearProyecto, onCancelarProyecto, onEliminarProyecto, onGuardarMaterialMantenimiento, onResolverInspeccion }) {
+export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, crearProyecto, onCancelarProyecto, onEliminarProyecto, onGuardarMaterialMantenimiento, onVentaMantenimiento, onResolverInspeccion }) {
   const garantiaDe = id => garantias.find(g => g.proyectoId === id);
   const [vista, setVista] = useState("proyectos");
   const [busqueda, setBusqueda] = useState("");
@@ -461,11 +470,15 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       )}
 
       {mantModal && (
-        <ModalMantenimiento tarea={mantModal.id ? mantModal : null} clientes={clientes} inventario={inventario} onCrearCliente={crearCliente}
+        <ModalMantenimiento tarea={mantModal.id ? mantModal : null} clientes={clientes} inventario={inventario} repuestos={repuestos} onCrearCliente={crearCliente}
           onGuardar={f => {
-            setTareas(p => p.some(t => t.id === f.id)
-              ? p.map(t => t.id === f.id ? registrar(f, "Mantenimiento editado", "Oficina") : t)
-              : [...p, registrar(f, "Mantenimiento creado", "Oficina")]);
+            const esNuevo = !tareas.some(t => t.id === f.id);
+            const { items, notaVenta, ...tarea } = f;   // los artículos van a la venta, no a la tarea
+            setTareas(p => esNuevo
+              ? [...p, registrar(tarea, "Mantenimiento creado", "Oficina")]
+              : p.map(t => t.id === tarea.id ? registrar(tarea, "Mantenimiento editado", "Oficina") : t));
+            // Un mantenimiento directo (fuera de cotización) también genera su venta.
+            if (esNuevo && items && items.length) onVentaMantenimiento({ ...tarea, items, notaVenta });
             setMantModal(null);
           }}
           onCerrar={() => setMantModal(null)} />

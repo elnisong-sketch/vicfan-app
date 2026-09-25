@@ -865,6 +865,16 @@ export default function App() {
   // borra su venta, sus garantías y sus tareas, y quita el proyecto.
   // La oficina registra el material de un mantenimiento: ajusta el stock por la
   // diferencia respecto a lo que ya tenía anotado y lo deja en el historial.
+  // Un mantenimiento creado directamente (fuera de cotización) genera su venta,
+  // con sus artículos y servicios, y descuenta el inventario. Igual que un
+  // proyecto directo.
+  const registrarVentaDeMantenimiento = tarea => {
+    const items = tarea.items || [];
+    const total = items.reduce((s, i) => s + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
+    const cliente = clientes.find(c => c.id === tarea.clienteId);
+    registrarVenta({ clienteId: tarea.clienteId, items, total, origen: `Mantenimiento${cliente ? " · " + cliente.nombre : ""}`, mantenimientoId: tarea.id, nota: tarea.notaVenta || "" });
+  };
+
   const guardarMaterialMantenimiento = (tarea, materiales) => {
     const nuevos = materiales.map(m => ({ ...m, cantidad: Number(m.cantidad) || 0 })).filter(m => m.cantidad > 0);
     const viejos = tarea.materiales || [];
@@ -1088,7 +1098,7 @@ export default function App() {
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos}
                                      garantias={garantias} setGarantias={setGarantias}
-                                     crearProyecto={crearProyectoDirecto} onCancelarProyecto={cancelarProyecto} onEliminarProyecto={eliminarProyecto} onGuardarMaterialMantenimiento={guardarMaterialMantenimiento} onResolverInspeccion={resolverInspeccion} />}
+                                     crearProyecto={crearProyectoDirecto} onCancelarProyecto={cancelarProyecto} onEliminarProyecto={eliminarProyecto} onGuardarMaterialMantenimiento={guardarMaterialMantenimiento} onVentaMantenimiento={registrarVentaDeMantenimiento} onResolverInspeccion={resolverInspeccion} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}

@@ -44,6 +44,8 @@ const NOTAS_FRECUENTES = [
 
 // Servicios que aparecen habitualmente en los presupuestos de la empresa.
 export const SERVICIOS_CATALOGO = [
+  { nombre: "Instalación", detalle: "", precio: 0 },
+  { nombre: "Mano de obra", detalle: "", precio: 0 },
   { nombre: "Suministro e instalación de acometida de gas bajo norma COVENIN", detalle: "Incluye regulación, arreglo mecánico de tubería y prueba", precio: 0 },
   { nombre: "Suministro e instalación de acometida eléctrica", detalle: "Incluye cable de control, potencia y carga", precio: 0 },
   { nombre: "Instalación y puesta en marcha", detalle: "Incluye transporte y descarga", precio: 0 },
