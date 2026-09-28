@@ -93,6 +93,7 @@ service cloud.firestore {
     // copiado en cada tarea, sin necesitar leer esta coleccion.
     match /vicfan_proyectos/{id}    { allow read, write: if esOficina(); }
     match /vicfan_movimientos/{id}  { allow read, write: if esOficina(); }
+    match /vicfan_kit/{id}          { allow read: if autenticado(); allow write: if esOficina(); }
 
     // ── Datos de apoyo ────────────────────────────────────────────────────────
     // El técnico necesita leer a qué cliente va y qué equipo lleva, pero no

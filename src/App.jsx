@@ -271,9 +271,78 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
   );
 }
 
+// ── KIT DE INSPECCIÓN: reponer (pasar repuestos del inventario al kit) ─────────
+function ModalReponerKit({ repuestos, setRepuestos, kit, setKit, setMovimientos, usuario, onCerrar }) {
+  const [busca, setBusca] = useState("");
+  const [sel, setSel] = useState(null);
+  const [cant, setCant] = useState("");
+  const ac = ACENTOS.inventario;
+  const norm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const q = norm(busca);
+  const opciones = q ? repuestos.filter(r => norm(`${r.nombre} ${r.codigo || ""}`).includes(q)).slice(0, 12) : [];
+  const enKit = id => kit.find(k => k.id === id)?.cantidad || 0;
+
+  const pasar = () => {
+    const n = Number(cant) || 0;
+    if (!sel || n <= 0) return;
+    setRepuestos(p => p.map(r => r.id === sel.id ? { ...r, stock: (Number(r.stock) || 0) - n } : r));
+    setKit(p => { const ya = p.find(k => k.id === sel.id); return ya ? p.map(k => k.id === sel.id ? { ...k, cantidad: (Number(k.cantidad) || 0) + n } : k) : [...p, { id: sel.id, nombre: sel.nombre, codigo: sel.codigo || "", cantidad: n }]; });
+    const base = { articuloId: sel.id, articuloNombre: sel.nombre, clase: "repuesto", cantidad: n, quien: usuario || "Oficina", fecha: hoy(), creadoEn: new Date().toISOString() };
+    setMovimientos(p => [...p,
+      { id: uid(), tipo: "salida", origen: "→ Kit de inspección", ubicacion: "inventario", ...base },
+      { id: uid(), tipo: "entrada", origen: "Reposición desde inventario", ubicacion: "kit", ...base },
+    ]);
+    setSel(null); setCant(""); setBusca("");
+  };
+
+  return (
+    <Modal onClose={onCerrar}>
+      <h3 style={{ margin: "0 0 6px", color: ac }}>🧰 Reponer Kit de Inspección</h3>
+      <p style={{ margin: "0 0 14px", fontSize: 12.5, color: TEXT_SUB, lineHeight: 1.5 }}>Elige un repuesto del inventario y la cantidad que pasa al kit. Se descuenta del inventario.</p>
+
+      {sel ? (
+        <div style={{ border: `1.5px solid ${ac}55`, borderRadius: 12, padding: 12, marginBottom: 14 }}>
+          <p style={{ margin: "0 0 8px", fontWeight: 700 }}>🔩 {sel.nombre} · stock {Number(sel.stock) || 0}{enKit(sel.id) ? ` · en kit ${enKit(sel.id)}` : ""}</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input type="number" value={cant} onChange={e => setCant(e.target.value)} placeholder="Cantidad" style={{ ...estiloInput, flex: 1 }} />
+            <Btn onClick={pasar} color={ac} small disabled={!(Number(cant) > 0)}>➕ Pasar al kit</Btn>
+            <Btn onClick={() => { setSel(null); setCant(""); }} color={TEXT_SUB} outline small>✕</Btn>
+          </div>
+        </div>
+      ) : (
+        <div style={{ marginBottom: 14 }}>
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="🔍 Buscar repuesto del inventario…" style={estiloInput} />
+          {q && (
+            <div style={{ border: `1px solid ${BORDER}`, borderRadius: 10, marginTop: 4, maxHeight: 220, overflowY: "auto" }}>
+              {opciones.length === 0 && <p style={{ margin: 0, padding: 10, fontSize: 13, color: TEXT_SUB }}>Nada coincide.</p>}
+              {opciones.map(r => (
+                <button key={r.id} type="button" onClick={() => { setSel(r); setBusca(""); }}
+                  style={{ display: "flex", justifyContent: "space-between", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: `1px solid ${BORDER}`, padding: "9px 12px", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit" }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🔩 {r.nombre}</span>
+                  <span style={{ color: TEXT_SUB, whiteSpace: "nowrap" }}>stock {Number(r.stock) || 0}{enKit(r.id) ? ` · kit ${enKit(r.id)}` : ""}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <Etiqueta>En el kit ({kit.length})</Etiqueta>
+      {kit.length === 0 && <p style={{ margin: "0 0 12px", fontSize: 13, color: TEXT_SUB }}>El kit está vacío.</p>}
+      {[...kit].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "")).map(k => (
+        <div key={k.id} style={{ display: "flex", justifyContent: "space-between", background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 10px", marginBottom: 6, fontSize: 13.5 }}>
+          <span>🔩 {k.nombre}</span><b>{k.cantidad}</b>
+        </div>
+      ))}
+      <div style={{ marginTop: 10 }}><Btn onClick={onCerrar} color={ac} full>Listo</Btn></div>
+    </Modal>
+  );
+}
+
 // ── INVENTARIO ────────────────────────────────────────────────────────────────
-function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, movimientos, setMovimientos }) {
+function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, movimientos, setMovimientos, kit, setKit, usuario }) {
   const [sub, setSub] = useState("modelos");
+  const [reponer, setReponer] = useState(false);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({});
   const [busqueda, setBusqueda] = useState("");
@@ -328,7 +397,8 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>📦 Inventario</h2>
-        {sub !== "historial" && <Btn onClick={() => { setForm(sub === "modelos" ? { id: uid(), codigo: "", nombre: "", potencia: "", combustible: "Gasolina", precio: 0, stock: 0 } : { id: uid(), codigo: "", nombre: "", precio: 0, stock: 0 }); setModal(true); }} color={ac} small>+ Nuevo</Btn>}
+        {(sub === "modelos" || sub === "repuestos") && <Btn onClick={() => { setForm(sub === "modelos" ? { id: uid(), codigo: "", nombre: "", potencia: "", combustible: "Gasolina", precio: 0, stock: 0 } : { id: uid(), codigo: "", nombre: "", precio: 0, stock: 0 }); setModal(true); }} color={ac} small>+ Nuevo</Btn>}
+        {sub === "kit" && <Btn onClick={() => setReponer(true)} color={ac} small>+ Reponer kit</Btn>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
         {[["Unidades", totalUnidades, ac], ["Valor", usd(valorTotal), GREEN], ["Agotados", agotados, agotados ? RED : GREEN]].map(([t, v, col]) => (
@@ -338,13 +408,13 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
           </Card>
         ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
-        {[{ id: "modelos", label: "⚡ Plantas" }, { id: "repuestos", label: "🔩 Repuestos" }, { id: "historial", label: "📥 Historial" }].map(t => (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+        {[{ id: "modelos", label: "⚡ Plantas" }, { id: "repuestos", label: "🔩 Repuestos" }, { id: "kit", label: "🧰 Kit de Inspección" }, { id: "historial", label: "📥 Historial" }].map(t => (
           <button key={t.id} onClick={() => setSub(t.id)} style={{ padding: "11px 6px", borderRadius: 12, border: `2px solid ${sub === t.id ? ac : BORDER}`, background: sub === t.id ? ac + "22" : BG_CARD, color: sub === t.id ? ac : TEXT_SUB, fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>{t.label}</button>
         ))}
       </div>
 
-      {sub !== "historial" && <>
+      {(sub === "modelos" || sub === "repuestos") && <>
       <div style={{ position: "relative", marginBottom: 14 }}>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por nombre o código…"
           style={{ width: "100%", boxSizing: "border-box", padding: "11px 36px 11px 12px", borderRadius: 12, border: `1px solid ${BORDER}`, background: BG_CARD, color: TEXT_MAIN, fontSize: 14, fontFamily: "inherit" }} />
@@ -390,7 +460,7 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
             ))}
           </div>
           {(() => {
-            const movs = [...movimientos].filter(m => histFiltro === "todo" || m.tipo === histFiltro).sort((a, b) => (b.creadoEn || "").localeCompare(a.creadoEn || ""));
+            const movs = [...movimientos].filter(m => m.ubicacion !== "kit" && (histFiltro === "todo" || m.tipo === histFiltro)).sort((a, b) => (b.creadoEn || "").localeCompare(a.creadoEn || ""));
             if (!movs.length) return <p style={{ color: TEXT_SUB, textAlign: "center", padding: "24px 0", fontSize: 14 }}>{movimientos.length ? "Nada en este filtro." : "Sin movimientos todavía. Se anotan al crear un artículo, al registrar una entrada (📥) y cuando una venta descuenta material."}</p>;
             return movs.map(m => {
               const entra = m.tipo !== "salida";
@@ -412,6 +482,47 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
             });
           })()}
         </>
+      )}
+
+      {sub === "kit" && (
+        <>
+          {kit.length === 0 && (
+            <p style={{ color: TEXT_SUB, textAlign: "center", padding: "24px 0", fontSize: 14 }}>
+              El kit está vacío. Con «+ Reponer kit» pasas repuestos del inventario al kit (se descuentan del inventario).
+            </p>
+          )}
+          {[...kit].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "")).map(k => (
+            <Card key={k.id}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>🔩 {k.nombre}</p>
+                <Badge text={`En kit: ${k.cantidad}`} color={(Number(k.cantidad) || 0) > 0 ? GREEN : RED} />
+              </div>
+            </Card>
+          ))}
+          {movimientos.some(m => m.ubicacion === "kit") && (
+            <>
+              <Etiqueta>Historial del kit</Etiqueta>
+              {[...movimientos].filter(m => m.ubicacion === "kit").sort((a, b) => (b.creadoEn || "").localeCompare(a.creadoEn || "")).map(m => {
+                const entra = m.tipo !== "salida";
+                return (
+                  <Card key={m.id}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ margin: "0 0 2px", fontWeight: 700, fontSize: 14 }}>🔩 {m.articuloNombre}</p>
+                        <p style={{ margin: 0, fontSize: 12.5, color: TEXT_SUB }}>📅 {m.fecha} · {m.origen}{m.quien ? ` · ${m.quien}` : ""}</p>
+                      </div>
+                      <p style={{ margin: 0, fontWeight: 800, fontSize: 16, color: entra ? GREEN : RED }}>{entra ? "+" : "−"}{m.cantidad}</p>
+                    </div>
+                  </Card>
+                );
+              })}
+            </>
+          )}
+        </>
+      )}
+
+      {reponer && (
+        <ModalReponerKit repuestos={repuestos} setRepuestos={setRepuestos} kit={kit} setKit={setKit} setMovimientos={setMovimientos} usuario={usuario} onCerrar={() => setReponer(false)} />
       )}
 
       {entrada && (
@@ -671,6 +782,7 @@ export default function App() {
   const [repuestos, setRepuestos]       = useColeccion("repuestos", [], conectado);
   const [garantias, setGarantias]       = useColeccion("garantias", [], conectado);
   const [movimientos, setMovimientos]   = useColeccion("movimientos", [], esOficina);
+  const [kit, setKit]                   = useColeccion("kit", [], conectado);
   const [tecnicos, setTecnicos]         = useColeccion("tecnicos", [], conectado);
   // Membrete del presupuesto: una sola ficha, pero se sincroniza igual que el
   // resto para que ambos dispositivos emitan con los mismos datos.
@@ -987,13 +1099,14 @@ export default function App() {
     if (Array.isArray(d.repuestos))    setRepuestos(d.repuestos);
     if (Array.isArray(d.garantias))    setGarantias(d.garantias);
     if (Array.isArray(d.movimientos))  setMovimientos(d.movimientos);
+    if (Array.isArray(d.kit))          setKit(d.kit);
     if (Array.isArray(d.tecnicos))     setTecnicos(d.tecnicos);
     if (Array.isArray(d.proyectos))    setProyectos(d.proyectos);
     setTab("inicio");
   };
 
   const exportarDatos = () => {
-    const datos = { clientes, cotizaciones, ventas, tareas, proyectos, inventario, repuestos, garantias, movimientos, tecnicos, exportado: new Date().toISOString() };
+    const datos = { clientes, cotizaciones, ventas, tareas, proyectos, inventario, repuestos, garantias, movimientos, kit, tecnicos, exportado: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1103,7 +1216,7 @@ export default function App() {
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEditarVenta={editarVenta} onEliminarVenta={eliminarVenta} />}
-        {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} movimientos={movimientos} setMovimientos={setMovimientos} />}
+        {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} movimientos={movimientos} setMovimientos={setMovimientos} kit={kit} setKit={setKit} usuario={sesion?.nombre || "Oficina"} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
         {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos}
           empresa={empresa} setEmpresa={d => setEmpresaLista([d])} correo={sesion.correo} />}
