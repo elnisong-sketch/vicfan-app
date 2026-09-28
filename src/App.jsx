@@ -367,6 +367,20 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
     setMovimientos(p => [...p, { id: uid(), fecha: hoy(), tipo: "entrada", clase: entrada.clase === "modelos" ? "planta" : "repuesto", articuloId: entrada.item.id, articuloNombre: entrada.item.nombre, cantidad: n, costoUnit: cu, costoTotal: cu * n, origen: "Compra", creadoEn: new Date().toISOString() }]);
     setEntrada(null);
   };
+
+  // Devolver un artículo del kit al inventario (corrección o fin de temporada).
+  const devolverDelKit = k => {
+    const n = Number(k.cantidad) || 0;
+    if (n <= 0) return;
+    if (!confirm(`¿Devolver ${n} × ${k.nombre} del kit al inventario?`)) return;
+    setRepuestos(p => p.some(r => r.id === k.id) ? p.map(r => r.id === k.id ? { ...r, stock: (Number(r.stock) || 0) + n } : r) : p);
+    setKit(p => p.filter(x => x.id !== k.id));
+    const base = { articuloId: k.id, articuloNombre: k.nombre, clase: "repuesto", cantidad: n, quien: usuario || "Oficina", fecha: hoy(), creadoEn: new Date().toISOString() };
+    setMovimientos(p => [...p,
+      { id: uid(), tipo: "salida", origen: "Devuelto al inventario", ubicacion: "kit", ...base },
+      { id: uid(), tipo: "entrada", origen: "Devuelto del kit de inspección", ubicacion: "inventario", ...base },
+    ]);
+  };
   const lista = sub === "modelos" ? inventario : repuestos;
   const setLista = sub === "modelos" ? setInventario : setRepuestos;
   // Búsqueda sin distinguir mayúsculas ni acentos, por nombre o código, y todo
@@ -495,7 +509,10 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
             <Card key={k.id}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>🔩 {k.nombre}</p>
-                <Badge text={`En kit: ${k.cantidad}`} color={(Number(k.cantidad) || 0) > 0 ? GREEN : RED} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Badge text={`En kit: ${k.cantidad}`} color={(Number(k.cantidad) || 0) > 0 ? GREEN : RED} />
+                  <Btn onClick={() => devolverDelKit(k)} color={RED} outline small>↩︎ Devolver</Btn>
+                </div>
               </div>
             </Card>
           ))}
