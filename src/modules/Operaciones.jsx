@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ACENTOS, ESTADO_COLOR, PRIORIDAD_COLOR, BG_INPUT, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB, GREEN, ORANGE, RED,
   hoy, fechaCorta, fechaLarga, sumarDias, esPasado,
@@ -294,7 +294,7 @@ function ModalMantenimiento({ tarea, clientes, inventario, repuestos, onCrearCli
 }
 
 // ── Módulo ─────────────────────────────────────────────────────────────────────
-export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, crearProyecto, onCancelarProyecto, onEliminarProyecto, onGuardarMaterialMantenimiento, onVentaMantenimiento, onResolverInspeccion }) {
+export default function ModuloOperaciones({ proyectos, setProyectos, tareas, setTareas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, crearProyecto, onCancelarProyecto, onEliminarProyecto, onGuardarMaterialMantenimiento, onVentaMantenimiento, onResolverInspeccion, abrirNuevo, onNuevoListo }) {
   const garantiaDe = id => garantias.find(g => g.proyectoId === id);
   const [vista, setVista] = useState("proyectos");
   const [busqueda, setBusqueda] = useState("");
@@ -302,6 +302,13 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
   const [detalle, setDetalle] = useState(null);
   const [matMant, setMatMant] = useState(null);
   const [mantModal, setMantModal] = useState(null);   // false=cerrado, {}=nuevo, tarea=editar
+
+  // El «+ Nuevo» de la oficina pide crear un proyecto o un mantenimiento: se
+  // cambia a la pestaña correcta y se abre su MISMO formulario de siempre.
+  useEffect(() => {
+    if (abrirNuevo === "proyecto") { setVista("proyectos"); setModal("proyecto"); onNuevoListo?.(); }
+    else if (abrirNuevo === "mantenimiento") { setVista("mantenimientos"); setMantModal({}); onNuevoListo?.(); }
+  }, [abrirNuevo]);
 
   const nombreCliente = id => clientes.find(c => c.id === id)?.nombre || "— sin cliente —";
   const crearCliente = c => setClientes(p => [...p, c]);
@@ -412,8 +419,6 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       ]} />
 
       {vista === "proyectos" && <>
-        <Btn onClick={() => setModal("proyecto")} color={ac} small>+ Nuevo proyecto</Btn>
-        <div style={{ height: 14 }} />
         {proyectos.length > 0 && (
           <div style={{ position: "relative", marginBottom: 14 }}>
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por proyecto, cliente o equipo…"
@@ -423,7 +428,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
               : <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: TEXT_SUB, fontSize: 14, pointerEvents: "none" }}>🔍</span>}
           </div>
         )}
-        {proyectos.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>Todavía no hay proyectos. Nacen al aprobar una cotización, al resolver una inspección o creándolos aquí.</p>}
+        {proyectos.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>Todavía no hay proyectos. Nacen al aprobar una cotización, al resolver una inspección o desde «+ Nuevo» en Inicio.</p>}
         {seccion("En marcha", abiertos, tarjetaProyecto, ac)}
         {seccion("Cerrados y cancelados", [...cerrados].sort((a, b) => (b.fechaCierre || "").localeCompare(a.fechaCierre || "")), tarjetaProyecto)}
       </>}
@@ -440,9 +445,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       </>}
 
       {vista === "mantenimientos" && <>
-        <Btn onClick={() => setMantModal({})} color={ac} small>+ Nuevo mantenimiento</Btn>
-        <div style={{ height: 14 }} />
-        {mants.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>No hay mantenimientos programados. Se programan solos al cerrar un proyecto, o créalos aquí con «+ Nuevo mantenimiento».</p>}
+        {mants.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>No hay mantenimientos programados. Se programan solos al cerrar un proyecto, o desde «+ Nuevo» en Inicio.</p>}
         {[["⚠️ Vencidos", vencidos, RED], ["Próximos 60 días", proximos, ac], ["Más adelante", masAdelante, TEXT_SUB]].map(([titulo, lista, color]) =>
           seccion(titulo, lista, t => (
             <Card key={t.id} style={{ padding: 14, borderLeft: `4px solid ${color}` }}>

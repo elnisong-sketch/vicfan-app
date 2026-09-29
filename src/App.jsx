@@ -148,7 +148,7 @@ function GarantiaVentaBloque({ planta, garantia, onActivar, onAnular }) {
   );
 }
 
-function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, onNuevaVenta, onEditarVenta, onEliminarVenta }) {
+function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, onNuevaVenta, onEditarVenta, onEliminarVenta, abrirNuevo, onNuevoListo }) {
   const ac = ACENTOS.ventas;
   const [modal, setModal] = useState(false);
   const [f, setF] = useState(null);
@@ -170,6 +170,8 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
     .sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
 
   const abrir = () => { setF({ clienteId: "", items: [], formaPago: "Efectivo", nota: "" }); setModal(true); };
+  // Cuando el «+ Nuevo» pide una venta directa, abre este mismo formulario.
+  useEffect(() => { if (abrirNuevo) { abrir(); onNuevoListo?.(); } }, [abrirNuevo]);
   const editar = v => { setF({ id: v.id, clienteId: v.clienteId, items: (v.items || []).map(i => ({ ...i })), formaPago: v.formaPago, nota: v.nota || "" }); setModal(true); };
   const guardar = () => {
     if (!f.clienteId || f.items.length === 0) return;
@@ -182,7 +184,6 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>💰 Ventas</h2>
-        <Btn onClick={abrir} color={ac} small>+ Venta directa</Btn>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
@@ -727,14 +728,46 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, emp
   );
 }
 
+// ── HOJA «+ NUEVO»: única puerta para crear venta / proyecto / mantenimiento ───
+// No cambia cómo se crea cada cosa; solo pregunta cuál y abre su formulario.
+function HojaNuevo({ onElegir, onCerrar }) {
+  const opciones = [
+    { tipo: "venta",         icono: "💰", titulo: "Venta directa",  sub: "No · solo vender (mostrador)",  color: GREEN },
+    { tipo: "proyecto",      icono: "🏗️", titulo: "Proyecto",       sub: "Sí · a instalar en sitio",      color: ACENTOS.operaciones },
+    { tipo: "mantenimiento", icono: "🔩", titulo: "Mantenimiento",  sub: "Sí · a dar servicio en sitio",  color: ORANGE },
+  ];
+  return (
+    <Modal onClose={onCerrar}>
+      <h3 style={{ margin: "0 0 2px", fontSize: 17, fontWeight: 900, color: TEXT_MAIN }}>¿Qué vas a registrar?</h3>
+      <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}>¿Requiere que vaya un técnico?</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {opciones.map(o => (
+          <button key={o.tipo} onClick={() => onElegir(o.tipo)}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", background: BG_CARD, border: `1px solid ${BORDER}`, borderLeft: `4px solid ${o.color}`, borderRadius: 12, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit" }}>
+            <span style={{ fontSize: 22 }}>{o.icono}</span>
+            <span style={{ minWidth: 0, flex: 1 }}>
+              <span style={{ display: "block", fontSize: 15, fontWeight: 800, color: TEXT_MAIN }}>{o.titulo}</span>
+              <span style={{ display: "block", fontSize: 12.5, color: TEXT_SUB }}>{o.sub}</span>
+            </span>
+            <span style={{ color: TEXT_SUB, fontSize: 18 }}>›</span>
+          </button>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
 // ── BIENVENIDA ────────────────────────────────────────────────────────────────
-function ModuloBienvenida({ setTab, stats }) {
+function ModuloBienvenida({ setTab, stats, onNuevo }) {
   const secciones = TABS.map(t => ({ ...t, color: ACENTOS[t.id] }));
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <p style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 900, color: TEXT_MAIN }}>¡Bienvenido!</p>
-        <p style={{ margin: 0, color: TEXT_SUB, fontSize: 14 }}>Panel de control VICFAN</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 20 }}>
+        <div>
+          <p style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 900, color: TEXT_MAIN }}>¡Bienvenido!</p>
+          <p style={{ margin: 0, color: TEXT_SUB, fontSize: 14 }}>Panel de control VICFAN</p>
+        </div>
+        {onNuevo && <Btn onClick={onNuevo} color={ACENTOS.ventas}>+ Nuevo</Btn>}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -808,6 +841,17 @@ export default function App() {
   // Cotización que hay que abrir ya rellenada al llegar desde una inspección.
   const [cotizacionInicial, setCotizacionInicial] = useState(null);
   const empresa = empresaLista[0] || EMPRESA_POR_DEFECTO;
+
+  // Entrada única para crear. En vez de un botón «+» distinto en cada módulo,
+  // un solo «+ Nuevo» pregunta qué se va a registrar y abre el MISMO formulario
+  // de siempre (no cambia nada de cómo se crea cada cosa, solo la puerta).
+  const [nuevoMenu, setNuevoMenu] = useState(false);
+  const [abrirNuevo, setAbrirNuevo] = useState(null);   // null | "venta" | "proyecto" | "mantenimiento"
+  const pedirNuevo = tipo => {
+    setNuevoMenu(false);
+    setTab(tipo === "venta" ? "ventas" : "operaciones");
+    setAbrirNuevo(tipo);
+  };
 
 
   const hayVersionNueva = useNuevaVersion();
@@ -1266,16 +1310,17 @@ export default function App() {
       <Cabecera />
 
       <div className="main-content" style={{ maxWidth: 760, margin: "0 auto" }}>
-        {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} /></>}
+        {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} onNuevo={() => setNuevoMenu(true)} /></>}
         {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} kit={kit} onResolverInspeccion={resolverInspeccion} />}
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos}
                                      garantias={garantias} setGarantias={setGarantias}
-                                     crearProyecto={crearProyectoDirecto} onCancelarProyecto={cancelarProyecto} onEliminarProyecto={eliminarProyecto} onGuardarMaterialMantenimiento={guardarMaterialMantenimiento} onVentaMantenimiento={registrarVentaDeMantenimiento} onResolverInspeccion={resolverInspeccion} />}
+                                     crearProyecto={crearProyectoDirecto} onCancelarProyecto={cancelarProyecto} onEliminarProyecto={eliminarProyecto} onGuardarMaterialMantenimiento={guardarMaterialMantenimiento} onVentaMantenimiento={registrarVentaDeMantenimiento} onResolverInspeccion={resolverInspeccion}
+                                     abrirNuevo={abrirNuevo} onNuevoListo={() => setAbrirNuevo(null)} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
-        {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEditarVenta={editarVenta} onEliminarVenta={eliminarVenta} />}
+        {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEditarVenta={editarVenta} onEliminarVenta={eliminarVenta} abrirNuevo={abrirNuevo === "venta"} onNuevoListo={() => setAbrirNuevo(null)} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} movimientos={movimientos} setMovimientos={setMovimientos} kit={kit} setKit={setKit} usuario={sesion?.nombre || "Oficina"} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
         {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos}
@@ -1296,6 +1341,8 @@ export default function App() {
           })}
         </div>
       </div>
+
+      {nuevoMenu && <HojaNuevo onElegir={pedirNuevo} onCerrar={() => setNuevoMenu(false)} />}
     </div>
   );
 }
