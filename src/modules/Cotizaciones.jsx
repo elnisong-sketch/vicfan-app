@@ -412,7 +412,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB, flex: 1 }}>✓ Aprobada · generó una tarea en 📅 Tareas</p>
               <Btn onClick={() => abrirEdicion(q)} color={ac} outline small>✏️ Modificar</Btn>
-              <Btn onClick={() => confirm("¿Eliminar esta cotización?\n\nSe borra solo la cotización. El proyecto y la venta que generó NO se borran; elimínalos por separado si hace falta.") && setCotizaciones(p => p.filter(x => x.id !== q.id))} color={RED} outline small>🗑️</Btn>
+              <Btn onClick={() => confirm("¿Eliminar esta cotización?\n\nSe borra solo la cotización. La instalación y la venta que generó NO se borran; elimínalos por separado si hace falta.") && setCotizaciones(p => p.filter(x => x.id !== q.id))} color={RED} outline small>🗑️</Btn>
             </div>
           )}
           {q.estado === "Rechazada" && (
@@ -518,7 +518,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
 
           <Etiqueta>Tipo de trabajo</Etiqueta>
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-            {[["Proyecto", "🏗️ Proyecto"], ["Mantenimiento", "🔩 Mantenimiento"]].map(([v, label]) => {
+            {[["Proyecto", "🏗️ Instalación"], ["Mantenimiento", "🔩 Mantenimiento"]].map(([v, label]) => {
               const activo = (form.tipoTrabajo || "Proyecto") === v;
               return (
                 <button key={v} type="button" onClick={() => set("tipoTrabajo", v)}

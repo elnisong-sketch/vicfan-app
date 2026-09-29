@@ -21,7 +21,7 @@ import AvisoInstalar from "./instalar.jsx";
 
 const TABS = [
   { id: "tareas",       icon: "📅", label: "Tareas" },
-  { id: "operaciones",  icon: "🏗️", label: "Proyectos" },
+  { id: "operaciones",  icon: "🏗️", label: "Instalac." },
   { id: "clientes",     icon: "👥", label: "Clientes" },
   { id: "cotizaciones", icon: "📋", label: "Cotizac." },
   { id: "ventas",       icon: "💰", label: "Ventas" },
@@ -226,7 +226,7 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
 
       {ventas.length === 0 && (
         <p style={{ color: TEXT_SUB, textAlign: "center", padding: "24px 0", fontSize: 14 }}>
-          Sin ventas todavía. Se crean aquí, o solas al aprobar una cotización o crear un proyecto.
+          Sin ventas todavía. Se crean aquí, o solas al aprobar una cotización o crear una instalación.
         </p>
       )}
       {ventas.length > 0 && visibles.length === 0 && (
@@ -282,7 +282,7 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
             <Btn onClick={() => setModal(false)} color={TEXT_SUB} outline full>Cancelar</Btn>
           </div>
           <p style={{ margin: "12px 2px 0", fontSize: 12, color: TEXT_SUB, lineHeight: 1.5 }}>
-            {f.id ? "Al cambiar los artículos, el inventario se ajusta por la diferencia." : "Descuenta el material del inventario. No genera cotización, proyecto ni tarea."}
+            {f.id ? "Al cambiar los artículos, el inventario se ajusta por la diferencia." : "Descuenta el material del inventario. No genera cotización, instalación ni tarea."}
           </p>
         </Modal>
       )}
@@ -604,7 +604,7 @@ function ModuloGarantias({ garantias, clientes }) {
   return (
     <div>
       <h2 style={{ color: ac, margin: "0 0 16px", fontSize: 18, fontWeight: 900 }}>🛡️ Garantías</h2>
-      {garantias.length === 0 && <p style={{ color: TEXT_SUB, textAlign: "center", marginTop: 40 }}>Sin garantías todavía. Se activan desde cada proyecto, el día de la puesta en marcha.</p>}
+      {garantias.length === 0 && <p style={{ color: TEXT_SUB, textAlign: "center", marginTop: 40 }}>Sin garantías todavía. Se activan desde cada instalación, el día de la puesta en marcha.</p>}
       {[...garantias].sort((a, b) => venceDe(a).localeCompare(venceDe(b))).map(g => {
         const dias = diasRestantes(g);
         const col = dias > 30 ? GREEN : dias > 0 ? ORANGE : RED;
@@ -751,7 +751,7 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, emp
 function HojaNuevo({ onElegir, onCerrar }) {
   const opciones = [
     { tipo: "venta",         icono: "💰", titulo: "Venta directa",  sub: "No · solo vender (mostrador)",  color: GREEN },
-    { tipo: "proyecto",      icono: "🏗️", titulo: "Proyecto",       sub: "Sí · a instalar en sitio",      color: ACENTOS.operaciones },
+    { tipo: "proyecto",      icono: "🏗️", titulo: "Instalación",    sub: "Sí · a instalar en sitio",      color: ACENTOS.operaciones },
     { tipo: "mantenimiento", icono: "🔩", titulo: "Mantenimiento",  sub: "Sí · a dar servicio en sitio",  color: ORANGE },
   ];
   return (
@@ -1040,7 +1040,7 @@ export default function App() {
   // salido y da por cerradas sus tareas pendientes. Es la vuelta atrás de una
   // venta que al final no fue.
   const cancelarProyecto = proyecto => {
-    if (!confirm(`¿Cancelar el proyecto «${proyecto.nombre}»?\n\nSu venta se anula, el material vuelve al inventario y sus visitas pendientes se cancelan.`)) return;
+    if (!confirm(`¿Cancelar la instalación «${proyecto.nombre}»?\n\nSu venta se anula, el material vuelve al inventario y sus visitas pendientes se cancelan.`)) return;
     const venta = ventas.find(v => v.proyectoId === proyecto.id && v.estado !== "Cancelada");
     if (venta?.consumoStock?.length) {
       const r = moverStock(inventario, repuestos, venta.consumoStock, +1);
@@ -1117,7 +1117,7 @@ export default function App() {
   };
 
   const eliminarProyecto = proyecto => {
-    if (!confirm(`¿Eliminar el proyecto «${proyecto.nombre}»?\n\nSe borran también su venta y sus tareas, y el material vuelve al inventario. No se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar la instalación «${proyecto.nombre}»?\n\nSe borran también su venta y sus tareas, y el material vuelve al inventario. No se puede deshacer.`)) return;
     const venta = ventas.find(v => v.proyectoId === proyecto.id && v.estado !== "Cancelada");
     if (venta?.consumoStock?.length) {
       const r = moverStock(inventario, repuestos, venta.consumoStock, +1);
@@ -1178,7 +1178,7 @@ export default function App() {
       return;
     }
     const proyecto = crearProyecto({
-      nombre: insp.modelo ? `Instalación ${insp.modelo}` : `Proyecto ${cliente?.nombre || ""}`.trim(),
+      nombre: insp.modelo ? `Instalación ${insp.modelo}` : `Instalación ${cliente?.nombre || ""}`.trim(),
       clienteId: insp.clienteId,
       direccion: insp.direccion || cliente?.direccion || "",
       equipo: insp.modelo || "",
@@ -1187,8 +1187,8 @@ export default function App() {
       inspeccionId: insp.id,
       materialKitUsado: insp.materialKit || [],
     });
-    descontarKitDeInspeccion(insp, "Proyecto");
-    marcar({ resultado: "Proyecto", proyectoIdGenerado: proyecto.id }, `Resultado: proyecto «${proyecto.nombre}»`);
+    descontarKitDeInspeccion(insp, "Instalación");
+    marcar({ resultado: "Instalación", proyectoIdGenerado: proyecto.id }, `Resultado: instalación «${proyecto.nombre}»`);
     setTab("operaciones");
   };
 

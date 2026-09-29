@@ -59,7 +59,7 @@ export const estaAbierta = t => t.estado === "Programada" || t.estado === "En pr
 const CATEGORIAS = [
   { value: "todas",         label: "Todas" },
   { value: "Inspección",    label: "🔍 Inspecciones" },
-  { value: "Instalación",   label: "🔧 Proyectos" },
+  { value: "Instalación",   label: "🔧 Instalaciones" },
   { value: "Mantenimiento", label: "🔩 Mantenimientos" },
   { value: "otras",         label: "🛠️ Otras" },
 ];
@@ -69,9 +69,9 @@ const enCategoria = (t, c) => c === "todas" || (c === "otras" ? !PRINCIPALES.inc
 export const ORIGENES_INSPECCION = ["Visita comercial", "Incidencia del cliente"];
 export const esIncidencia = t => t.tipo === "Inspección" && t.origen === "Incidencia del cliente";
 // Los dos valores de siempre, con el nombre que usa el equipo en el día a día.
-export const ETIQUETA_ORIGEN = { "Visita comercial": "🏗️ Para proyecto", "Incidencia del cliente": "🩺 Diagnóstico de falla" };
+export const ETIQUETA_ORIGEN = { "Visita comercial": "🏗️ Para instalación", "Incidencia del cliente": "🩺 Diagnóstico de falla" };
 export const claseInspeccion = t => ETIQUETA_ORIGEN[t.origen] || ETIQUETA_ORIGEN["Visita comercial"];
-export const RESULTADO_COLOR = { "Proyecto": GREEN, "Cotización": ORANGE, "No concretada": TEXT_SUB };
+export const RESULTADO_COLOR = { "Instalación": GREEN, "Proyecto": GREEN, "Mantenimiento": ACENTOS.operaciones, "Cotización": ORANGE, "No concretada": TEXT_SUB };
 const estaAtrasada = t => estaAbierta(t) && esPasado(t.fecha);
 // Las tareas anteriores a esta función no tienen el campo, y deben seguir
 // viéndose: solo se oculta lo que se marcó explícitamente como no publicado.
@@ -327,7 +327,7 @@ function MaterialKit({ kit, lista, onCambio, soloLectura }) {
           {!soloLectura && <button onClick={() => quitar(it.id)} style={{ background: "none", border: "none", color: RED, cursor: "pointer", fontSize: 16, padding: "0 4px" }}>✕</button>}
         </div>
       ))}
-      <p style={{ margin: "6px 2px 0", fontSize: 11.5, color: TEXT_SUB }}>Se descuenta del kit solo si la inspección pasa a Proyecto o Mantenimiento.</p>
+      <p style={{ margin: "6px 2px 0", fontSize: 11.5, color: TEXT_SUB }}>Se descuenta del kit solo si la inspección pasa a Instalación o Mantenimiento.</p>
     </div>
   );
 }
@@ -572,7 +572,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, kit = [], onMaterialKit, o
           <div style={{ background: ORANGE + "11", border: `1px solid ${ORANGE}44`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
             <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, color: ORANGE }}>¿En qué quedó esta inspección?</p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Btn onClick={() => onResolver("proyecto")} color={GREEN} small>🏗️ Crear proyecto</Btn>
+              <Btn onClick={() => onResolver("proyecto")} color={GREEN} small>🏗️ Crear instalación</Btn>
               <Btn onClick={() => onResolver("mantenimiento")} color={ACENTOS.operaciones} small>🔩 Mantenimiento</Btn>
               <Btn onClick={() => onResolver("cotizacion")} color={ORANGE} small>📋 Hacer cotización</Btn>
               <Btn onClick={() => onResolver("no")} color={TEXT_SUB} outline small>✗ No se concretó</Btn>

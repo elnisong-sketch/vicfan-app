@@ -60,14 +60,14 @@ function ModalProyecto({ clientes, onCrearCliente, inventario, repuestos, onGuar
 
   return (
     <Modal onClose={onCerrar}>
-      <h3 style={{ margin: "0 0 16px", color: ac }}>🏗️ Nuevo proyecto</h3>
+      <h3 style={{ margin: "0 0 16px", color: ac }}>🏗️ Nueva instalación</h3>
       <SelectorCliente clientes={clientes} valor={f.clienteId} onCambio={elegirCliente} onCrear={onCrearCliente} />
 
-      <Etiqueta>Materiales y equipos del proyecto</Etiqueta>
+      <Etiqueta>Materiales y equipos de la instalación</Etiqueta>
       <LineasItems items={f.items || []} inventario={inventario} repuestos={repuestos}
         onCambio={items => setF(p => { const planta = items.find(i => i.modeloId); return { ...p, items, equipo: planta ? planta.nombre : p.equipo, nombre: p.nombre || (planta ? `Instalación ${planta.nombre}` : "") }; })} />
 
-      <Inp label="Nombre del proyecto" value={f.nombre} onChange={v => set("nombre", v)} placeholder="Instalación Generac 26kW" />
+      <Inp label="Nombre de la instalación" value={f.nombre} onChange={v => set("nombre", v)} placeholder="Instalación Generac 26kW" />
       <Inp label="Dirección" value={f.direccion} onChange={v => set("direccion", v)} />
       <Area label="Alcance del trabajo" value={f.descripcion} onChange={v => set("descripcion", v)} placeholder="Qué incluye, instrucciones para el técnico…" />
       <Area label="Nota de la venta (opcional)" value={f.nota || ""} onChange={v => set("nota", v)} placeholder="La rellena el dueño…" />
@@ -80,11 +80,11 @@ function ModalProyecto({ clientes, onCrearCliente, inventario, repuestos, onGuar
         options={MESES_MANTENIMIENTO.map(o => ({ value: String(o.value), label: o.label }))} />
 
       <div style={{ background: BG_INPUT, borderRadius: 10, padding: "10px 12px", marginBottom: 14, fontSize: 12, color: TEXT_SUB, lineHeight: 1.6 }}>
-        Se crea también la tarea de instalación, sin publicar. Cuando la finalicen, el proyecto se cierra solo y se programa su primer mantenimiento.
+        Se crea también la tarea de instalación, sin publicar. Cuando la finalicen, la instalación se cierra sola y se programa su primer mantenimiento.
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <Btn onClick={() => onGuardar(f)} color={ac} full disabled={!f.clienteId || !f.nombre.trim()}>Crear proyecto</Btn>
+        <Btn onClick={() => onGuardar(f)} color={ac} full disabled={!f.clienteId || !f.nombre.trim()}>Crear instalación</Btn>
         <Btn onClick={onCerrar} color={TEXT_SUB} outline full>Cancelar</Btn>
       </div>
     </Modal>
@@ -159,7 +159,7 @@ function DetalleProyecto({ proyecto, tareas, garantia, esPlanta, nombreCliente, 
         {proyecto.equipo && <div>⚡ <b>Equipo:</b> {proyecto.equipo}</div>}
         {proyecto.direccion && <div>📍 <b>Dirección:</b> {proyecto.direccion}</div>}
         {proyecto.descripcion && <div style={{ whiteSpace: "pre-line" }}>📝 {proyecto.descripcion}</div>}
-        <div>🔩 <b>Próximo mantenimiento:</b> {proximo ? fechaLarga(proximo.fecha) : cerrado ? "—" : "se programa al cerrar el proyecto"}</div>
+        <div>🔩 <b>Próximo mantenimiento:</b> {proximo ? fechaLarga(proximo.fecha) : cerrado ? "—" : "se programa al cerrar la instalación"}</div>
         {proyecto.consumoStock?.length > 0 && <div>📦 <b>Material descontado:</b> {resumenMaterial(proyecto.consumoStock)}</div>}
       </div>
 
@@ -169,7 +169,7 @@ function DetalleProyecto({ proyecto, tareas, garantia, esPlanta, nombreCliente, 
       <Sel label="Mantenimiento" value={String(proyecto.mantenimientoMeses ?? 6)} onChange={v => onMeses(Number(v))}
         options={MESES_MANTENIMIENTO.map(o => ({ value: String(o.value), label: o.label }))} />
 
-      <Etiqueta>Visitas del proyecto ({suyas.length})</Etiqueta>
+      <Etiqueta>Visitas de la instalación ({suyas.length})</Etiqueta>
       {suyas.length === 0 && <p style={{ fontSize: 13, color: TEXT_SUB, margin: "0 0 12px" }}>Todavía no hay visitas.</p>}
       {suyas.map(t => (
         <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, border: `1px solid ${BORDER}`, borderLeft: `4px solid ${ESTADO_COLOR[t.estado] || TEXT_SUB}`, borderRadius: 10, padding: "8px 10px", marginBottom: 6, fontSize: 13 }}>
@@ -201,9 +201,9 @@ function DetalleProyecto({ proyecto, tareas, garantia, esPlanta, nombreCliente, 
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {cerrado
-          ? <Btn onClick={onReabrir} color={ORANGE} outline small>↺ Reabrir proyecto</Btn>
-          : !cancelado && <Btn onClick={onCerrarProyecto} color={GREEN} small>✓ Cerrar proyecto</Btn>}
-        {!cerrado && !cancelado && <Btn onClick={onCancelarProyecto} color={RED} outline small>✗ Cancelar proyecto</Btn>}
+          ? <Btn onClick={onReabrir} color={ORANGE} outline small>↺ Reabrir instalación</Btn>
+          : !cancelado && <Btn onClick={onCerrarProyecto} color={GREEN} small>✓ Cerrar instalación</Btn>}
+        {!cerrado && !cancelado && <Btn onClick={onCancelarProyecto} color={RED} outline small>✗ Cancelar instalación</Btn>}
         <Btn onClick={onEliminarProyecto} color={RED} small>🗑️ Eliminar</Btn>
         <Btn onClick={onCerrar} color={TEXT_SUB} outline small>Cerrar</Btn>
       </div>
@@ -362,7 +362,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       </div>
       {t.estado === "Completada" && !t.resultado && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-          <Btn onClick={() => onResolverInspeccion(t, "proyecto")} color={GREEN} small>🏗️ Proyecto</Btn>
+          <Btn onClick={() => onResolverInspeccion(t, "proyecto")} color={GREEN} small>🏗️ Instalación</Btn>
           <Btn onClick={() => onResolverInspeccion(t, "mantenimiento")} color={ac} small>🔩 Mantenimiento</Btn>
           <Btn onClick={() => onResolverInspeccion(t, "cotizacion")} color={ORANGE} small>📋 Cotizar</Btn>
           <Btn onClick={() => onResolverInspeccion(t, "no")} color={TEXT_SUB} outline small>✗ No se concretó</Btn>
@@ -410,10 +410,10 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
 
   return (
     <div>
-      <h2 style={{ color: ac, margin: "0 0 14px", fontSize: 18, fontWeight: 900 }}>🏗️ Proyectos</h2>
+      <h2 style={{ color: ac, margin: "0 0 14px", fontSize: 18, fontWeight: 900 }}>🏗️ Instalaciones</h2>
 
       <Chips value={vista} onChange={setVista} color={ac} opciones={[
-        { value: "proyectos",     label: `🏗️ Proyectos${abiertos.length ? ` (${abiertos.length})` : ""}` },
+        { value: "proyectos",     label: `🏗️ Instalaciones${abiertos.length ? ` (${abiertos.length})` : ""}` },
         { value: "inspecciones",  label: `🔍 Inspecciones${porResolver.length + pendientesVisita.length ? ` (${porResolver.length + pendientesVisita.length})` : ""}` },
         { value: "mantenimientos", label: `🔩 Mantenimientos${vencidos.length ? ` ⚠️${vencidos.length}` : ""}` },
       ]} />
@@ -421,21 +421,21 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       {vista === "proyectos" && <>
         {proyectos.length > 0 && (
           <div style={{ position: "relative", marginBottom: 14 }}>
-            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por proyecto, cliente o equipo…"
+            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por instalación, cliente o equipo…"
               style={{ width: "100%", boxSizing: "border-box", padding: "11px 36px 11px 12px", borderRadius: 12, border: `1px solid ${BORDER}`, background: BG_CARD, color: TEXT_SUB, fontSize: 14, fontFamily: "inherit" }} />
             {busqueda
               ? <button onClick={() => setBusqueda("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: TEXT_SUB, fontSize: 15, cursor: "pointer", padding: 4 }}>✕</button>
               : <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: TEXT_SUB, fontSize: 14, pointerEvents: "none" }}>🔍</span>}
           </div>
         )}
-        {proyectos.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>Todavía no hay proyectos. Nacen al aprobar una cotización, al resolver una inspección o desde «+ Nuevo» en Inicio.</p>}
+        {proyectos.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>Todavía no hay instalaciones. Nacen al aprobar una cotización, al resolver una inspección o desde «+ Nuevo» en Inicio.</p>}
         {seccion("En marcha", abiertos, tarjetaProyecto, ac)}
         {seccion("Cerrados y cancelados", [...cerrados].sort((a, b) => (b.fechaCierre || "").localeCompare(a.fechaCierre || "")), tarjetaProyecto)}
       </>}
 
       {vista === "inspecciones" && <>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-          <Btn onClick={() => setModal("Visita comercial")} color={ac} small>🏗️ Inspección para proyecto</Btn>
+          <Btn onClick={() => setModal("Visita comercial")} color={ac} small>🏗️ Inspección para instalación</Btn>
           <Btn onClick={() => setModal("Incidencia del cliente")} color={RED} small>🩺 Diagnóstico de falla</Btn>
         </div>
         {inspecciones.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>Sin inspecciones todavía.</p>}
@@ -445,7 +445,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       </>}
 
       {vista === "mantenimientos" && <>
-        {mants.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>No hay mantenimientos programados. Se programan solos al cerrar un proyecto, o desde «+ Nuevo» en Inicio.</p>}
+        {mants.length === 0 && <p style={{ color: TEXT_SUB, fontSize: 14, textAlign: "center", padding: "24px 0" }}>No hay mantenimientos programados. Se programan solos al cerrar una instalación, o desde «+ Nuevo» en Inicio.</p>}
         {[["⚠️ Vencidos", vencidos, RED], ["Próximos 60 días", proximos, ac], ["Más adelante", masAdelante, TEXT_SUB]].map(([titulo, lista, color]) =>
           seccion(titulo, lista, t => (
             <Card key={t.id} style={{ padding: 14, borderLeft: `4px solid ${color}` }}>
@@ -498,7 +498,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       )}
       {proyectoAbierto && (
         <DetalleProyecto proyecto={proyectoAbierto} tareas={tareas} nombreCliente={nombreCliente}
-          onVisita={(tipo, fecha) => setTareas(p => [...p, registrar(tareaDeProyecto(proyectoAbierto, { tipo, fecha }), `${tipo} añadida al proyecto`, "Oficina")])}
+          onVisita={(tipo, fecha) => setTareas(p => [...p, registrar(tareaDeProyecto(proyectoAbierto, { tipo, fecha }), `${tipo} añadida a la instalación`, "Oficina")])}
           onCerrarProyecto={() => actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, estado: "Cerrado", fechaCierre: hoy() }, "Cerrado a mano", "Oficina"))}
           onReabrir={() => actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, estado: "Abierto", fechaCierre: null, autoCierre: false }, "Reabierto", "Oficina"))}
           onCancelarProyecto={() => { onCancelarProyecto(proyectoAbierto); setDetalle(null); }}
@@ -511,7 +511,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
             actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, fechaPuestaEnMarcha: fecha }, `Garantía activada: puesta en marcha el ${fechaCorta(fecha)}, vence el ${fechaCorta(g.vence)}`, "Oficina"));
           }}
           onAnularGarantia={() => {
-            if (!confirm("¿Anular la garantía de este proyecto?")) return;
+            if (!confirm("¿Anular la garantía de esta instalación?")) return;
             setGarantias(p => p.filter(x => x.proyectoId !== proyectoAbierto.id));
             actualizarProyecto(proyectoAbierto.id, x => registrar({ ...x, fechaPuestaEnMarcha: null }, "Garantía anulada", "Oficina"));
           }}
