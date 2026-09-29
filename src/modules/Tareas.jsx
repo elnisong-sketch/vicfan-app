@@ -739,7 +739,7 @@ function VistaSemana({ tareas, base, setBase, nombreCliente, abrir }) {
 }
 
 // ── MÓDULO PRINCIPAL ──────────────────────────────────────────────────────────
-export default function ModuloTareas({ tareas, setTareas, clientes, setClientes, tecnicos, sesion, kit = [], onResolverInspeccion }) {
+export default function ModuloTareas({ tareas, setTareas, clientes, setClientes, tecnicos, sesion, kit = [], onResolverInspeccion, onCerrarConVenta }) {
   const [vista, setVista]         = useState("hoy");
   const [categoria, setCategoria] = useState("todas");
   const [baseSemana, setBaseSemana] = useState(hoy());
@@ -773,6 +773,8 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
 
   const confirmarCierre = cierre => {
     actualizar(cerrando.id, x => registrar({ ...x, estado: "Completada", cierre }, "Finalizada", cierre.tecnicoNombre));
+    // Si la oficina puso un costo final, ese cobro queda registrado como venta.
+    onCerrarConVenta?.(cerrando, cierre);
     setCerrando(null);
     setDetalle(null);
   };

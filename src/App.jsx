@@ -886,7 +886,7 @@ export default function App() {
     }))]);
   };
 
-  const registrarVenta = ({ clienteId, items = [], total, formaPago = "Por definir", origen = "Directa", proyectoId = null, cotizacionId = null, estado = "Pendiente cobro", nota = "" }) => {
+  const registrarVenta = ({ clienteId, items = [], total, formaPago = "Por definir", origen = "Directa", proyectoId = null, cotizacionId = null, mantenimientoId = null, estado = "Pendiente cobro", nota = "" }) => {
     const consumo = materialDeItems(items);
     if (consumo.length) {
       const r = moverStock(inventario, repuestos, consumo, -1);
@@ -900,7 +900,7 @@ export default function App() {
     // libre del mismo hilo compartido con las cotizaciones.
     const numero = (cotizacionId && cotizaciones.find(c => c.id === cotizacionId)?.numero)
       || numeroPara([...cotizaciones, ...ventas], hoy());
-    const venta = { id: uid(), fecha: hoy(), numero, clienteId, items, total: suma, formaPago, estado, origen, proyectoId, cotizacionId, nota, consumoStock: consumo, creadaEn: new Date().toISOString() };
+    const venta = { id: uid(), fecha: hoy(), numero, clienteId, items, total: suma, formaPago, estado, origen, proyectoId, cotizacionId, mantenimientoId, nota, consumoStock: consumo, creadaEn: new Date().toISOString() };
     setVentas(p => [...p, venta]);
     anotarMov(consumo, "salida", origen);
     return venta;
@@ -1052,6 +1052,26 @@ export default function App() {
     const total = items.reduce((s, i) => s + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
     const cliente = clientes.find(c => c.id === tarea.clienteId);
     registrarVenta({ clienteId: tarea.clienteId, items, total, origen: `Mantenimiento${cliente ? " · " + cliente.nombre : ""}`, mantenimientoId: tarea.id, nota: tarea.notaVenta || "" });
+  };
+
+  // Al cerrar una tarea con un costo final, ese cobro queda registrado como una
+  // venta (pendiente de cobro). Así el trabajo no se queda sin su ingreso. Se
+  // evita duplicar: no toca las tareas de un proyecto (que ya factura por su
+  // lado) ni las que ya generaron su venta al crearse con artículos.
+  const registrarVentaAlCerrar = (tarea, cierre) => {
+    const costo = Number(cierre?.costoFinal) || 0;
+    if (costo <= 0) return;
+    if (tarea.proyectoId) return;
+    if (ventas.some(v => v.mantenimientoId === tarea.id && v.estado !== "Cancelada")) return;
+    const cliente = clientes.find(c => c.id === tarea.clienteId);
+    registrarVenta({
+      clienteId: tarea.clienteId,
+      items: [],
+      total: costo,
+      origen: `${tarea.tipo || "Servicio"}${cliente ? " · " + cliente.nombre : ""}`,
+      mantenimientoId: tarea.id,
+      nota: cierre.trabajoRealizado || "",
+    });
   };
 
   const guardarMaterialMantenimiento = (tarea, materiales) => {
@@ -1317,7 +1337,7 @@ export default function App() {
 
       <div className="main-content" style={{ maxWidth: 760, margin: "0 auto" }}>
         {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} onNuevo={() => setNuevoMenu(true)} /></>}
-        {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} kit={kit} onResolverInspeccion={resolverInspeccion} />}
+        {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} kit={kit} onResolverInspeccion={resolverInspeccion} onCerrarConVenta={registrarVentaAlCerrar} />}
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos}
                                      garantias={garantias} setGarantias={setGarantias}
