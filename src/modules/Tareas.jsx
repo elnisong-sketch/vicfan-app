@@ -297,34 +297,26 @@ function ModalTarea({ form, setForm, clientes, onCrearCliente, onGuardar, onCerr
 
 // ── MATERIAL DEL KIT en una inspección (lo listan oficina y técnico) ──────────
 function MaterialKit({ kit, lista, onCambio, soloLectura }) {
-  const [busca, setBusca] = useState("");
-  const norm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const q = norm(busca);
-  const opciones = q ? kit.filter(k => norm(k.nombre).includes(q)).slice(0, 8) : [];
   const agregar = k => {
     const ya = lista.find(x => x.id === k.id);
     onCambio(ya ? lista.map(x => x.id === k.id ? { ...x, cantidad: (Number(x.cantidad) || 0) + 1 } : x) : [...lista, { id: k.id, nombre: k.nombre, cantidad: 1 }]);
-    setBusca("");
   };
   const cambiar = (id, v) => onCambio(lista.map(x => x.id === id ? { ...x, cantidad: v } : x));
   const quitar = id => onCambio(lista.filter(x => x.id !== id));
+  // Solo se puede elegir lo que hay en el kit; lo ya anadido no vuelve a salir.
+  const disponibles = kit.filter(k => !lista.some(x => x.id === k.id));
   return (
     <div style={{ marginBottom: 16 }}>
       <Etiqueta>🧰 Material del kit usado</Etiqueta>
       {!soloLectura && (
-        <div style={{ position: "relative", marginBottom: 8 }}>
-          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="🔍 Buscar en el kit…" style={estiloInput} />
-          {q && (
-            <div style={{ border: `1px solid ${BORDER}`, borderRadius: 10, marginTop: 4, maxHeight: 180, overflowY: "auto" }}>
-              {opciones.length === 0 && <p style={{ margin: 0, padding: 10, fontSize: 13, color: TEXT_SUB }}>Nada en el kit coincide.</p>}
-              {opciones.map(k => (
-                <button key={k.id} type="button" onClick={() => agregar(k)}
-                  style={{ display: "flex", justifyContent: "space-between", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: `1px solid ${BORDER}`, padding: "9px 12px", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit" }}>
-                  <span>🔩 {k.nombre}</span><span style={{ color: TEXT_SUB }}>en kit: {k.cantidad}</span>
-                </button>
-              ))}
-            </div>
-          )}
+        <div style={{ marginBottom: 8 }}>
+          <select value="" onChange={e => { const k = kit.find(x => x.id === e.target.value); if (k) agregar(k); }} style={estiloInput}>
+            <option value="">➕ Añadir material del kit…</option>
+            {kit.length === 0 && <option value="" disabled>El kit está vacío</option>}
+            {disponibles.map(k => (
+              <option key={k.id} value={k.id}>🔩 {k.nombre} (en kit: {k.cantidad})</option>
+            ))}
+          </select>
         </div>
       )}
       {lista.length === 0 && <p style={{ margin: 0, fontSize: 12.5, color: TEXT_SUB }}>Sin material del kit todavía.</p>}
