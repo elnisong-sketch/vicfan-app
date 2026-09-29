@@ -49,7 +49,7 @@ service cloud.firestore {
     // cliente, la fecha, el precio ni si está publicada: eso es de oficina.
     function soloCamposDeCampo() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['estado', 'fotos', 'observaciones', 'historial', 'cierre', 'cierresPrevios']);
+        .hasOnly(['estado', 'fotos', 'observaciones', 'historial', 'cierre', 'cierresPrevios', 'materialKit']);
     }
 
     // ── Tareas ────────────────────────────────────────────────────────────────

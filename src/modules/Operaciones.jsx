@@ -356,6 +356,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
       {t.estado === "Completada" && !t.resultado && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
           <Btn onClick={() => onResolverInspeccion(t, "proyecto")} color={GREEN} small>🏗️ Proyecto</Btn>
+          <Btn onClick={() => onResolverInspeccion(t, "mantenimiento")} color={ac} small>🔩 Mantenimiento</Btn>
           <Btn onClick={() => onResolverInspeccion(t, "cotizacion")} color={ORANGE} small>📋 Cotizar</Btn>
           <Btn onClick={() => onResolverInspeccion(t, "no")} color={TEXT_SUB} outline small>✗ No se concretó</Btn>
         </div>

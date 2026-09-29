@@ -295,6 +295,51 @@ function ModalTarea({ form, setForm, clientes, onCrearCliente, onGuardar, onCerr
   );
 }
 
+// ── MATERIAL DEL KIT en una inspección (lo listan oficina y técnico) ──────────
+function MaterialKit({ kit, lista, onCambio, soloLectura }) {
+  const [busca, setBusca] = useState("");
+  const norm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const q = norm(busca);
+  const opciones = q ? kit.filter(k => norm(k.nombre).includes(q)).slice(0, 8) : [];
+  const agregar = k => {
+    const ya = lista.find(x => x.id === k.id);
+    onCambio(ya ? lista.map(x => x.id === k.id ? { ...x, cantidad: (Number(x.cantidad) || 0) + 1 } : x) : [...lista, { id: k.id, nombre: k.nombre, cantidad: 1 }]);
+    setBusca("");
+  };
+  const cambiar = (id, v) => onCambio(lista.map(x => x.id === id ? { ...x, cantidad: v } : x));
+  const quitar = id => onCambio(lista.filter(x => x.id !== id));
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <Etiqueta>🧰 Material del kit usado</Etiqueta>
+      {!soloLectura && (
+        <div style={{ position: "relative", marginBottom: 8 }}>
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="🔍 Buscar en el kit…" style={estiloInput} />
+          {q && (
+            <div style={{ border: `1px solid ${BORDER}`, borderRadius: 10, marginTop: 4, maxHeight: 180, overflowY: "auto" }}>
+              {opciones.length === 0 && <p style={{ margin: 0, padding: 10, fontSize: 13, color: TEXT_SUB }}>Nada en el kit coincide.</p>}
+              {opciones.map(k => (
+                <button key={k.id} type="button" onClick={() => agregar(k)}
+                  style={{ display: "flex", justifyContent: "space-between", gap: 8, width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: `1px solid ${BORDER}`, padding: "9px 12px", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit" }}>
+                  <span>🔩 {k.nombre}</span><span style={{ color: TEXT_SUB }}>en kit: {k.cantidad}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {lista.length === 0 && <p style={{ margin: 0, fontSize: 12.5, color: TEXT_SUB }}>Sin material del kit todavía.</p>}
+      {lista.map(it => (
+        <div key={it.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center", background: BG_INPUT, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "8px 10px", marginBottom: 6 }}>
+          <span style={{ fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🔩 {it.nombre}</span>
+          {soloLectura ? <b>{it.cantidad}</b> : <input type="number" value={it.cantidad ?? ""} onChange={e => cambiar(it.id, e.target.value)} style={{ ...estiloInput, width: 64, textAlign: "center" }} />}
+          {!soloLectura && <button onClick={() => quitar(it.id)} style={{ background: "none", border: "none", color: RED, cursor: "pointer", fontSize: 16, padding: "0 4px" }}>✕</button>}
+        </div>
+      ))}
+      <p style={{ margin: "6px 2px 0", fontSize: 11.5, color: TEXT_SUB }}>Se descuenta del kit solo si la inspección pasa a Proyecto o Mantenimiento.</p>
+    </div>
+  );
+}
+
 // ── MODAL: CERRAR TAREA (evidencia + quién la cerró) ──────────────────────────
 function ModalCierre({ tarea, tecnicos, sesion, onFotos, onConfirmar, onCancelar }) {
   const esTecnico = sesion?.rol === "tecnico";
@@ -491,7 +536,7 @@ function Observaciones({ notas, onAgregar, onBorrador, onEditar, onBorrar, puede
 }
 
 // ── MODAL: DETALLE / HISTORIAL ────────────────────────────────────────────────
-function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, onCancelarTarea, onEliminar, onFotos, onObservacion, onEditarObservacion, onBorrarObservacion, onReabrir, onPublicar, onResolver, onCerrar }) {
+function ModalDetalle({ tarea, nombreCliente, sesion, kit = [], onMaterialKit, onEditar, onReprogramar, onCancelarTarea, onEliminar, onFotos, onObservacion, onEditarObservacion, onBorrarObservacion, onReabrir, onPublicar, onResolver, onCerrar }) {
   const [nuevaFecha, setNuevaFecha] = useState(tarea.fecha);
   const [reprogramando, setReprogramando] = useState(false);
   const [confirmarReapertura, setConfirmarReapertura] = useState(false);
@@ -519,6 +564,11 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
         {tarea.proyectoNombre && <><br /><span style={{ color: ACENTOS.operaciones, fontWeight: 700 }}>🏗️ {tarea.proyectoNombre}</span></>}
       </p>
 
+      {/* Material del kit usado en la inspección: lo listan oficina y técnico. */}
+      {tarea.tipo === "Inspección" && tarea.estado !== "Cancelada" && onMaterialKit && (
+        <MaterialKit kit={kit} lista={tarea.materialKit || []} onCambio={onMaterialKit} soloLectura={!!tarea.resultado} />
+      )}
+
       {/* Una inspección terminada hay que resolverla: o se convierte en
           trabajo, o queda registrado que no se concretó. Solo la oficina. */}
       {!esTecnico && tarea.tipo === "Inspección" && tarea.estado === "Completada" && onResolver && (
@@ -531,6 +581,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, onEditar, onReprogramar, o
             <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 800, color: ORANGE }}>¿En qué quedó esta inspección?</p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Btn onClick={() => onResolver("proyecto")} color={GREEN} small>🏗️ Crear proyecto</Btn>
+              <Btn onClick={() => onResolver("mantenimiento")} color={ACENTOS.operaciones} small>🔩 Mantenimiento</Btn>
               <Btn onClick={() => onResolver("cotizacion")} color={ORANGE} small>📋 Hacer cotización</Btn>
               <Btn onClick={() => onResolver("no")} color={TEXT_SUB} outline small>✗ No se concretó</Btn>
             </div>
@@ -696,7 +747,7 @@ function VistaSemana({ tareas, base, setBase, nombreCliente, abrir }) {
 }
 
 // ── MÓDULO PRINCIPAL ──────────────────────────────────────────────────────────
-export default function ModuloTareas({ tareas, setTareas, clientes, setClientes, tecnicos, sesion, onResolverInspeccion }) {
+export default function ModuloTareas({ tareas, setTareas, clientes, setClientes, tecnicos, sesion, kit = [], onResolverInspeccion }) {
   const [vista, setVista]         = useState("hoy");
   const [categoria, setCategoria] = useState("todas");
   const [baseSemana, setBaseSemana] = useState(hoy());
@@ -761,6 +812,11 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
 
   // El comentario se guarda y ademas deja huella en el historial, para que la
   // visita se pueda leer en orden sin ir saltando entre secciones.
+  // El material del kit que se lista en una inspección. Lo pueden tocar oficina
+  // y técnico mientras la inspección está abierta; se descuenta del kit solo al
+  // pasar a Proyecto o Mantenimiento.
+  const guardarMaterialKit = (t, lista) => actualizar(t.id, x => registrar({ ...x, materialKit: lista }, "Material del kit actualizado", quienActua));
+
   const agregarObservacion = (t, texto) => actualizar(t.id, x => registrar({
     ...x,
     observaciones: [...(x.observaciones || []), { id: uid(), texto, autor: quienActua, deOficina: !esTecnico, cuando: new Date().toISOString() }],
@@ -912,6 +968,7 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
           onReabrir={() => reabrir(detalle)}
           onPublicar={valor => publicar(detalle, valor)}
           onResolver={onResolverInspeccion ? r => { onResolverInspeccion(tareas.find(t => t.id === detalle.id) || detalle, r); setDetalle(null); } : null}
+          kit={kit} onMaterialKit={lista => guardarMaterialKit(detalle, lista)}
           onCerrar={() => setDetalle(null)} />
       )}
 

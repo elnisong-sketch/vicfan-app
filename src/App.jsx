@@ -1046,8 +1046,19 @@ export default function App() {
 
   // Cerrar el círculo de una inspección ya realizada: o se convierte en
   // trabajo, o queda escrito que no se concretó y por qué.
+  // Descuenta del KIT (no del inventario) el material que se listó en la
+  // inspección, y lo deja en el historial del kit con fecha y usuario.
+  const descontarKitDeInspeccion = (insp, destino) => {
+    const mats = insp.materialKit || [];
+    if (!mats.length) return;
+    const cli = clientes.find(c => c.id === insp.clienteId)?.nombre || "";
+    const quien = sesion?.nombre || "Oficina";
+    setKit(prev => prev.map(k => { const m = mats.find(x => x.id === k.id); return m ? { ...k, cantidad: (Number(k.cantidad) || 0) - (Number(m.cantidad) || 0) } : k; }));
+    setMovimientos(p => [...p, ...mats.map(m => ({ id: uid(), fecha: hoy(), tipo: "salida", clase: "repuesto", articuloId: m.id, articuloNombre: m.nombre, cantidad: Number(m.cantidad) || 0, origen: `Inspección → ${destino}${cli ? " · " + cli : ""}`, ubicacion: "kit", quien, creadoEn: new Date().toISOString() }))]);
+  };
+
   const resolverInspeccion = (insp, resultado) => {
-    const marcar = (campos, accion) => setTareas(p => p.map(t => t.id === insp.id ? registrar({ ...t, ...campos }, accion, "Oficina") : t));
+    const marcar = (campos, accion) => setTareas(p => p.map(t => t.id === insp.id ? registrar({ ...t, ...campos }, accion, sesion?.nombre || "Oficina") : t));
     const cliente = clientes.find(c => c.id === insp.clienteId);
 
     if (resultado === "no") {
@@ -1057,9 +1068,26 @@ export default function App() {
       return;
     }
     if (resultado === "cotizacion") {
+      // La cotización no descuenta el kit: no se aprobó, no se usó nada.
       marcar({ resultado: "Cotización" }, "Resultado: se hace cotización");
       setCotizacionInicial({ clienteId: insp.clienteId, inspeccionId: insp.id });
       setTab("cotizaciones");
+      return;
+    }
+    if (resultado === "mantenimiento") {
+      const tarea = registrar({
+        ...tareaVacia(insp.clienteId),
+        tipo: "Mantenimiento",
+        modelo: insp.modelo || "",
+        direccion: insp.direccion || cliente?.direccion || "",
+        descripcion: insp.descripcion || "",
+        inspeccionId: insp.id,
+        materialKit: insp.materialKit || [],
+      }, "Creado desde una inspección", "Oficina");
+      setTareas(p => [...p, tarea]);
+      descontarKitDeInspeccion(insp, "Mantenimiento");
+      marcar({ resultado: "Mantenimiento", mantenimientoIdGenerado: tarea.id }, "Resultado: mantenimiento");
+      setTab("operaciones");
       return;
     }
     const proyecto = crearProyecto({
@@ -1070,7 +1098,9 @@ export default function App() {
       descripcion: insp.descripcion || "",
       origen: "Inspección",
       inspeccionId: insp.id,
+      materialKitUsado: insp.materialKit || [],
     });
+    descontarKitDeInspeccion(insp, "Proyecto");
     marcar({ resultado: "Proyecto", proyectoIdGenerado: proyecto.id }, `Resultado: proyecto «${proyecto.nombre}»`);
     setTab("operaciones");
   };
@@ -1211,7 +1241,7 @@ export default function App() {
         <Cabecera />
         <div className="main-content" style={{ maxWidth: 760, margin: "0 auto", paddingBottom: 40 }}>
           <AvisoInstalar />
-          <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} />
+          <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} kit={kit} />
         </div>
       </div>
     );
@@ -1224,7 +1254,7 @@ export default function App() {
 
       <div className="main-content" style={{ maxWidth: 760, margin: "0 auto" }}>
         {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} /></>}
-        {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} onResolverInspeccion={resolverInspeccion} />}
+        {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} kit={kit} onResolverInspeccion={resolverInspeccion} />}
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos}
                                      garantias={garantias} setGarantias={setGarantias}
