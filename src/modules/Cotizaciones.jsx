@@ -58,14 +58,18 @@ export const SERVICIOS_CATALOGO = [
 ];
 
 /**
- * Numeración por fecha: la del 9 de septiembre de 2026 es la 20260909. Si ese
- * mismo día entra otra, se le añade _1, luego _2, y así.
- * @param excluirId id de la cotización que se está editando, para que no
- *                  choque consigo misma al cambiarle la fecha.
+ * Numeración por fecha, con correlativo ÚNICO compartido entre cotizaciones y
+ * ventas directas: la del 9 de septiembre de 2026 es la 20260909. Si ese mismo
+ * día ya se usó ese número (por otra cotización o una venta directa), se añade
+ * _1, luego _2, y así, por orden de creación.
+ * @param registros  lista de documentos con `numero` (cotizaciones + ventas)
+ *                   contra la que buscar el siguiente libre.
+ * @param excluirId  id del documento que se está editando, para que no choque
+ *                   consigo mismo al cambiarle la fecha.
  */
-export const numeroPara = (cotizaciones, fecha, excluirId) => {
+export const numeroPara = (registros, fecha, excluirId) => {
   const base = (fecha || hoy()).replaceAll("-", "");
-  const usados = new Set(cotizaciones.filter(q => q.id !== excluirId).map(q => q.numero));
+  const usados = new Set((registros || []).filter(q => q.id !== excluirId).map(q => q.numero));
   if (!usados.has(base)) return base;
   let n = 1;
   while (usados.has(`${base}_${n}`)) n++;
@@ -80,9 +84,9 @@ export const numeroVisible = q => q.numero || (q.fecha || "").replaceAll("-", ""
  *  cotizaciones antiguas siguen leyéndose sin perder la que tuvieran. */
 export const notasDe = q => (Array.isArray(q.notas) ? q.notas : q.nota ? [q.nota] : []);
 
-export const cotizacionVacia = cotizaciones => ({
+export const cotizacionVacia = registros => ({
   id: uid(),
-  numero: numeroPara(cotizaciones, hoy()),
+  numero: numeroPara(registros, hoy()),
   clienteId: "",
   fecha: hoy(),
   estado: "Pendiente",
@@ -287,7 +291,10 @@ export function LineasItems({ items, onCambio, inventario, repuestos }) {
 }
 
 // ── MÓDULO ────────────────────────────────────────────────────────────────────
-export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clientes, setClientes, inventario, repuestos, empresa, onAprobar, onEditarAprobada, inicial, onInicialUsado }) {
+export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, ventas = [], clientes, setClientes, inventario, repuestos, empresa, onAprobar, onEditarAprobada, inicial, onInicialUsado }) {
+  // El correlativo es único entre cotizaciones y ventas directas: para elegir el
+  // siguiente número libre se miran las dos listas juntas.
+  const registrosNumerados = [...cotizaciones, ...ventas];
   const [modal, setModal] = useState(false);
   const [detalle, setDetalle] = useState(null);
   const [form, setForm] = useState(null);
@@ -326,13 +333,13 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
 
   const setItems = items => setForm(f => ({ ...f, items, total: items.reduce((s, i) => s + (i.subtotal || 0), 0) }));
 
-  const abrirNueva = () => { setForm(cotizacionVacia(cotizaciones)); setCreandoCliente(false); setModal(true); };
+  const abrirNueva = () => { setForm(cotizacionVacia(registrosNumerados)); setCreandoCliente(false); setModal(true); };
 
   // Llegada desde una inspección que se concretó: se abre una cotización nueva
   // con el cliente ya puesto, y queda enlazada a esa inspección.
   useEffect(() => {
     if (!inicial) return;
-    setForm({ ...cotizacionVacia(cotizaciones), clienteId: inicial.clienteId, inspeccionId: inicial.inspeccionId });
+    setForm({ ...cotizacionVacia(registrosNumerados), clienteId: inicial.clienteId, inspeccionId: inicial.inspeccionId });
     setCreandoCliente(false);
     setModal(true);
     onInicialUsado?.();
@@ -479,7 +486,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, clie
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 10 }}>
             <Inp label="Nº de presupuesto" value={form.numero || ""} onChange={v => set("numero", v)} />
             <Inp label="Fecha de emisión" type="date" value={form.fecha}
-              onChange={v => setForm(f => ({ ...f, fecha: v, numero: numeroPara(cotizaciones, v, f.id) }))} />
+              onChange={v => setForm(f => ({ ...f, fecha: v, numero: numeroPara(registrosNumerados, v, f.id) }))} />
           </div>
 
           {/* Crear el cliente aquí mismo evita perder la cotización a medias. */}

@@ -10,7 +10,7 @@ import ModuloTareas, { registrar, tareaVacia } from "./modules/Tareas.jsx";
 import ModuloOperaciones from "./modules/Operaciones.jsx";
 import { proyectoVacio, tareaDeProyecto, planAutomatico, diasHasta, garantiaDeVenta } from "./proyectos.js";
 import { materialDeItems, moverStock, avisoFaltantes } from "./inventario.js";
-import ModuloCotizaciones, { EMPRESA_POR_DEFECTO, LineasItems } from "./modules/Cotizaciones.jsx";
+import ModuloCotizaciones, { EMPRESA_POR_DEFECTO, LineasItems, numeroPara } from "./modules/Cotizaciones.jsx";
 import { SelectorCliente } from "./modules/Inspeccion.jsx";
 import PantallaLogin from "./sesion.jsx";
 import { useSesion, salir as cerrarSesion } from "./auth.js";
@@ -222,7 +222,7 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
             <div style={{ minWidth: 0 }}>
               <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 15 }}>{nc(v.clienteId)}</p>
               <p style={{ margin: "0 0 2px", fontSize: 13, color: TEXT_SUB }}>📅 {v.fecha} · 💳 {v.formaPago}</p>
-              <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB }}>{v.origen}{v.items?.length ? ` · ${v.items.length} ítem(s)` : ""}</p>
+              <p style={{ margin: 0, fontSize: 12, color: TEXT_SUB }}>{v.numero ? `Nº ${v.numero} · ` : ""}{v.origen}{v.items?.length ? ` · ${v.items.length} ítem(s)` : ""}</p>
               {v.nota && <p style={{ margin: "4px 0 0", fontSize: 12.5, color: TEXT_SUB, fontStyle: "italic" }}>📝 {v.nota}</p>}
             </div>
             <div style={{ textAlign: "right" }}>
@@ -894,7 +894,12 @@ export default function App() {
       if (r.faltantes.length) setTimeout(() => alert(avisoFaltantes(r.faltantes)), 50);
     }
     const suma = total ?? items.reduce((sum, i) => sum + (Number(i.subtotal) || (Number(i.cantidad) || 0) * (Number(i.precio) || 0)), 0);
-    const venta = { id: uid(), fecha: hoy(), clienteId, items, total: suma, formaPago, estado, origen, proyectoId, cotizacionId, nota, consumoStock: consumo, creadaEn: new Date().toISOString() };
+    // Correlativo único: si la venta nace de una cotización, hereda su número;
+    // si es directa (o de un proyecto/mantenimiento directo), toma el siguiente
+    // libre del mismo hilo compartido con las cotizaciones.
+    const numero = (cotizacionId && cotizaciones.find(c => c.id === cotizacionId)?.numero)
+      || numeroPara([...cotizaciones, ...ventas], hoy());
+    const venta = { id: uid(), fecha: hoy(), numero, clienteId, items, total: suma, formaPago, estado, origen, proyectoId, cotizacionId, nota, consumoStock: consumo, creadaEn: new Date().toISOString() };
     setVentas(p => [...p, venta]);
     anotarMov(consumo, "salida", origen);
     return venta;
@@ -1318,7 +1323,7 @@ export default function App() {
                                      crearProyecto={crearProyectoDirecto} onCancelarProyecto={cancelarProyecto} onEliminarProyecto={eliminarProyecto} onGuardarMaterialMantenimiento={guardarMaterialMantenimiento} onVentaMantenimiento={registrarVentaDeMantenimiento} onResolverInspeccion={resolverInspeccion}
                                      abrirNuevo={abrirNuevo} onNuevoListo={() => setAbrirNuevo(null)} />}
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
-        {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
+        {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} ventas={ventas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEditarVenta={editarVenta} onEliminarVenta={eliminarVenta} abrirNuevo={abrirNuevo === "venta"} onNuevoListo={() => setAbrirNuevo(null)} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} movimientos={movimientos} setMovimientos={setMovimientos} kit={kit} setKit={setKit} usuario={sesion?.nombre || "Oficina"} />}
