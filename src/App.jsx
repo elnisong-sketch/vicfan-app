@@ -148,11 +148,27 @@ function GarantiaVentaBloque({ planta, garantia, onActivar, onAnular }) {
   );
 }
 
-function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, onNuevaVenta, onEditarVenta, onEliminarVenta, abrirNuevo, onNuevoListo }) {
+function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, repuestos, garantias, setGarantias, empresa, onNuevaVenta, onEditarVenta, onEliminarVenta, abrirNuevo, onNuevoListo }) {
   const ac = ACENTOS.ventas;
   const [modal, setModal] = useState(false);
   const [f, setF] = useState(null);
   const [busqueda, setBusqueda] = useState("");
+  const [generandoNota, setGenerandoNota] = useState(null);   // id de la venta cuya nota se está generando
+
+  // Nota de entrega en PDF: usa el mismo número de la venta y el membrete de la
+  // empresa. Se comparte (WhatsApp) o se descarga, igual que el presupuesto.
+  const generarNota = async v => {
+    setGenerandoNota(v.id);
+    try {
+      const { construirNotaEntrega, nombreArchivoNota, entregarPDF } = await import("./modules/pdfCotizacion.js");
+      const doc = construirNotaEntrega({ venta: v, cliente: clientes.find(c => c.id === v.clienteId), empresa });
+      await entregarPDF(doc, nombreArchivoNota(v));
+    } catch {
+      alert("No se pudo generar la nota. Inténtalo de nuevo.");
+    } finally {
+      setGenerandoNota(null);
+    }
+  };
   const nc = id => clientes.find(c => c.id === id)?.nombre || "—";
 
   const activas = ventas.filter(v => v.estado !== "Cancelada");
@@ -235,6 +251,7 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
             {v.estado === "Pendiente cobro" && (
               <Btn onClick={() => setVentas(p => p.map(x => x.id === v.id ? { ...x, estado: "Cobrada" } : x))} color={GREEN} small>✓ Marcar cobrada</Btn>
             )}
+            {v.estado !== "Cancelada" && <Btn onClick={() => generarNota(v)} color={ac} outline small disabled={generandoNota === v.id}>{generandoNota === v.id ? "…" : "🧾 Nota"}</Btn>}
             {v.estado !== "Cancelada" && <Btn onClick={() => editar(v)} color={ac} outline small>✏️</Btn>}
             <Btn onClick={() => onEliminarVenta(v)} color={RED} outline small>🗑️</Btn>
           </div>
@@ -1346,7 +1363,7 @@ export default function App() {
         {tab === "clientes"     && <ModuloClientes clientes={clientes} setClientes={setClientes} />}
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} ventas={ventas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
-        {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEditarVenta={editarVenta} onEliminarVenta={eliminarVenta} abrirNuevo={abrirNuevo === "venta"} onNuevoListo={() => setAbrirNuevo(null)} />}
+        {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} empresa={empresa} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEditarVenta={editarVenta} onEliminarVenta={eliminarVenta} abrirNuevo={abrirNuevo === "venta"} onNuevoListo={() => setAbrirNuevo(null)} />}
         {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} movimientos={movimientos} setMovimientos={setMovimientos} kit={kit} setKit={setKit} usuario={sesion?.nombre || "Oficina"} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
         {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos}

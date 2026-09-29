@@ -192,6 +192,127 @@ export function construirPDF({ cotizacion, cliente, empresa, inventario = [], no
 
 export const nombreArchivo = cotizacion => `Presupuesto-${cotizacion.numero || "vicfan"}.pdf`;
 
+// ── NOTA DE ENTREGA ───────────────────────────────────────────────────────────
+// Documento no fiscal que acompaña la mercancía o el servicio. Reutiliza el
+// membrete y el estilo del presupuesto, y usa el MISMO número correlativo de la
+// venta. Si la venta no tiene artículos (p. ej. un mantenimiento cerrado con un
+// costo global), se muestra una sola línea con el concepto y el total.
+export function construirNotaEntrega({ venta, cliente, empresa }) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  let y = MARGEN;
+
+  // Membrete
+  let xTexto = MARGEN;
+  if (empresa?.logo) {
+    try { doc.addImage(empresa.logo, "PNG", MARGEN, y, 38, 12, undefined, "FAST"); xTexto = MARGEN + 43; } catch { /* sin logo */ }
+  }
+  doc.setFont("helvetica", "bold").setFontSize(13).setTextColor(...NEGRO);
+  doc.text(empresa?.nombre || "", xTexto, y + 5);
+  doc.setFont("helvetica", "normal").setFontSize(8.5).setTextColor(...GRIS);
+  doc.text(empresa?.rif || "", xTexto, y + 9.5);
+  if (empresa?.eslogan) doc.text(empresa.eslogan, xTexto, y + 13);
+  y += 18;
+  doc.setDrawColor(...NEGRO).setLineWidth(0.5).line(MARGEN, y, ANCHO - MARGEN, y);
+  y += 8;
+
+  // Título
+  doc.setFont("helvetica", "bold").setFontSize(12).setTextColor(...NEGRO);
+  doc.text(`NOTA DE ENTREGA Nº ${venta.numero || ""}`, ANCHO / 2, y, { align: "center" });
+  y += 9;
+
+  // Datos del cliente
+  const filas = [
+    ["FECHA:", venta.fecha || ""],
+    ["NOMBRE O RAZÓN SOCIAL:", `${cliente?.nombre || "—"}${cliente?.documento ? `   ${cliente.documento}` : ""}`],
+    ["DIRECCIÓN:", cliente?.direccion || "—"],
+    ["FORMA DE PAGO:", venta.formaPago || "—"],
+  ];
+  doc.setFontSize(9);
+  for (const [etiqueta, valor] of filas) {
+    doc.setFont("helvetica", "bold").text(etiqueta, MARGEN, y);
+    doc.setFont("helvetica", "normal");
+    const lineas = partir(doc, valor, UTIL - 48);
+    doc.text(lineas, MARGEN + 48, y);
+    y += 4.5 * lineas.length;
+  }
+  y += 4;
+
+  // Tabla de partidas
+  const COL = { desc: MARGEN, cant: MARGEN + 108, unit: MARGEN + 130, total: ANCHO - MARGEN };
+  const anchoDesc = 104;
+  const cabecera = () => {
+    doc.setFillColor(238, 238, 238).rect(MARGEN, y, UTIL, 7, "F");
+    doc.setDrawColor(...NEGRO).setLineWidth(0.2).rect(MARGEN, y, UTIL, 7);
+    doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(...NEGRO);
+    doc.text("DESCRIPCIÓN", COL.desc + 2, y + 4.6);
+    doc.text("CANT.", COL.cant + 2, y + 4.6);
+    doc.text("PRECIO UNIT.", COL.unit + 2, y + 4.6);
+    doc.text("TOTAL US.", COL.total - 2, y + 4.6, { align: "right" });
+    y += 7;
+  };
+  cabecera();
+
+  // Si no hay artículos, una sola línea con el concepto y el total.
+  const partidas = (venta.items && venta.items.length)
+    ? venta.items
+    : [{ nombre: venta.nota || venta.origen || "Servicio", cantidad: 1, precio: venta.total, subtotal: venta.total }];
+
+  doc.setFontSize(8.5);
+  for (const it of partidas) {
+    const lineasNombre = partir(doc, it.nombre, anchoDesc - 4);
+    const lineasDet = it.detalle ? partir(doc, it.detalle, anchoDesc - 4) : [];
+    const alto = Math.max(4.2 * (lineasNombre.length + lineasDet.length) + 4, 9);
+    if (y + alto > ALTO - 45) { doc.addPage(); y = MARGEN; cabecera(); doc.setFontSize(8.5); }
+
+    doc.setDrawColor(...NEGRO).setLineWidth(0.2).rect(MARGEN, y, UTIL, alto);
+    doc.line(COL.cant, y, COL.cant, y + alto);
+    doc.line(COL.unit, y, COL.unit, y + alto);
+
+    let yTexto = y + 5;
+    doc.setFont("helvetica", "bold").setTextColor(...NEGRO);
+    doc.text(lineasNombre, COL.desc + 2, yTexto);
+    yTexto += 4.2 * lineasNombre.length;
+    if (lineasDet.length) {
+      doc.setFont("helvetica", "normal").setFontSize(7.5).setTextColor(...GRIS);
+      doc.text(lineasDet, COL.desc + 2, yTexto);
+      doc.setFontSize(8.5);
+    }
+    doc.setFont("helvetica", "normal").setTextColor(...NEGRO);
+    doc.text(String(it.cantidad ?? 1), COL.cant + 8, y + 5, { align: "center" });
+    doc.text(usd(it.precio), COL.unit + 26, y + 5, { align: "right" });
+    doc.text(usd(it.subtotal ?? (Number(it.cantidad) || 0) * (Number(it.precio) || 0)), COL.total - 2, y + 5, { align: "right" });
+    y += alto;
+  }
+
+  // Total
+  doc.setDrawColor(...NEGRO).rect(MARGEN, y, UTIL, 7);
+  doc.line(COL.unit, y, COL.unit, y + 7);
+  doc.setFont("helvetica", "bold").setFontSize(10);
+  doc.text("TOTAL US:", COL.unit - 2, y + 4.8, { align: "right" });
+  doc.text(usd(venta.total), COL.total - 2, y + 4.8, { align: "right" });
+  y += 14;
+
+  // Firma de recibido
+  doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(...NEGRO);
+  doc.line(MARGEN, y, MARGEN + 70, y);
+  doc.text("Recibí conforme", MARGEN, y + 4);
+
+  // Pie
+  const pie = ALTO - 22;
+  doc.setDrawColor(...NEGRO).setLineWidth(0.3).line(MARGEN, pie, ANCHO - MARGEN, pie);
+  doc.setFont("helvetica", "normal").setFontSize(7).setTextColor(...GRIS);
+  const lineasPie = [
+    empresa?.direccion,
+    [empresa?.telefonos, empresa?.email].filter(Boolean).join("  ·  "),
+    empresa?.web,
+  ].filter(Boolean);
+  lineasPie.forEach((t, i) => doc.text(partir(doc, t, UTIL), ANCHO / 2, pie + 4 + i * 3.4, { align: "center" }));
+
+  return doc;
+}
+
+export const nombreArchivoNota = venta => `Nota-entrega-${venta.numero || "vicfan"}.pdf`;
+
 /**
  * Entrega el PDF por el mejor camino que admita el dispositivo: compartirlo
  * (para mandarlo por WhatsApp desde el móvil) o descargarlo.
