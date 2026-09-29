@@ -1122,20 +1122,33 @@ export default function App() {
     }
   }, [esOficina, tareasListas, proyectosListos, proyectos, tareas]);
 
-  // Si el cliente cambia de idea y se modifica un presupuesto ya aprobado, la
-  // tarea tiene que reflejarlo: el técnico va a la calle con ese alcance. El
-  // cambio queda anotado en su historial para que no pase desapercibido.
-  const actualizarTareaDeCotizacion = q => setTareas(p => p.map(t => {
-    if (t.cotizacionId !== q.id) return t;
-    const alcance = alcanceDeCotizacion(q);
-    const sinCambios = t.modelo === alcance.modelo && t.descripcion === alcance.descripcion && t.costo === alcance.costo;
-    if (sinCambios) return t;
-    return {
-      ...t,
-      ...alcance,
-      historial: [...(t.historial || []), { accion: `Alcance actualizado desde la cotización Nº ${q.numero}`, quien: "Oficina", cuando: new Date().toISOString() }],
-    };
-  }));
+  // Si el cliente cambia de idea y se modifica un presupuesto ya aprobado, todo
+  // lo que salió de esa cotización tiene que reflejarlo:
+  //  1) La tarea/proyecto: el técnico va a la calle con el nuevo alcance.
+  //  2) La venta ya generada: sus artículos y total, y el inventario se ajusta
+  //     por la diferencia (si añadió material, ese material sale del stock).
+  // Así, añadir material a una cotización aprobada aparece también en Ventas.
+  const actualizarTareaDeCotizacion = q => {
+    setTareas(p => p.map(t => {
+      if (t.cotizacionId !== q.id) return t;
+      const alcance = alcanceDeCotizacion(q);
+      const sinCambios = t.modelo === alcance.modelo && t.descripcion === alcance.descripcion && t.costo === alcance.costo;
+      if (sinCambios) return t;
+      return {
+        ...t,
+        ...alcance,
+        historial: [...(t.historial || []), { accion: `Alcance actualizado desde la cotización Nº ${q.numero}`, quien: "Oficina", cuando: new Date().toISOString() }],
+      };
+    }));
+    // La venta de esa cotización (mientras no esté anulada) se pone al día con
+    // el nuevo material y total. editarVenta ya devuelve al inventario lo viejo
+    // y descuenta lo nuevo, y anota la diferencia en los movimientos.
+    const venta = ventas.find(v => v.cotizacionId === q.id && v.estado !== "Cancelada");
+    if (venta) {
+      const mismos = JSON.stringify(venta.items) === JSON.stringify(q.items);
+      if (!mismos) editarVenta(venta.id, { clienteId: venta.clienteId, items: q.items, formaPago: venta.formaPago, nota: venta.nota });
+    }
+  };
 
   const restaurarDatos = d => {
     if (Array.isArray(d.clientes))     setClientes(d.clientes);
