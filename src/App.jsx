@@ -184,6 +184,7 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>💰 Ventas</h2>
+        <Btn onClick={abrir} color={ac} small>+ Venta directa</Btn>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
