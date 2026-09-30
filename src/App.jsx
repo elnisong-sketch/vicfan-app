@@ -21,7 +21,7 @@ import AvisoInstalar from "./instalar.jsx";
 
 const TABS = [
   { id: "tareas",       icon: "📅", label: "Tareas" },
-  { id: "operaciones",  icon: "🏗️", label: "Instalac." },
+  { id: "operaciones",  icon: "🏗️", label: "Proyectos" },
   { id: "clientes",     icon: "👥", label: "Clientes" },
   { id: "cotizaciones", icon: "📋", label: "Cotizac." },
   { id: "ventas",       icon: "💰", label: "Ventas" },

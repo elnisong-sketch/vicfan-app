@@ -410,7 +410,7 @@ export default function ModuloOperaciones({ proyectos, setProyectos, tareas, set
 
   return (
     <div>
-      <h2 style={{ color: ac, margin: "0 0 14px", fontSize: 18, fontWeight: 900 }}>🏗️ Instalaciones</h2>
+      <h2 style={{ color: ac, margin: "0 0 14px", fontSize: 18, fontWeight: 900 }}>🏗️ Proyectos</h2>
 
       <Chips value={vista} onChange={setVista} color={ac} opciones={[
         { value: "proyectos",     label: `🏗️ Instalaciones${abiertos.length ? ` (${abiertos.length})` : ""}` },
