@@ -359,12 +359,15 @@ function ModalReponerKit({ repuestos, setRepuestos, kit, setKit, setMovimientos,
 }
 
 // ── INVENTARIO ────────────────────────────────────────────────────────────────
-function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, movimientos, setMovimientos, kit, setKit, usuario }) {
+function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, movimientos, setMovimientos, kit, setKit, usuario, umbralStock = 3, verBajos, onVerBajosListo }) {
   const [sub, setSub] = useState("modelos");
   const [reponer, setReponer] = useState(false);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({});
   const [busqueda, setBusqueda] = useState("");
+  const [soloBajos, setSoloBajos] = useState(false);   // filtro: solo repuestos con poco stock
+  // Desde el aviso de Inicio: abre los repuestos ya filtrados por stock bajo.
+  useEffect(() => { if (verBajos) { setSub("repuestos"); setSoloBajos(true); onVerBajosListo?.(); } }, [verBajos]);
   const [entrada, setEntrada] = useState(null);        // { item, clase } al que se le añade stock
   const [entCant, setEntCant] = useState("");
   const [entCosto, setEntCosto] = useState("");
@@ -374,6 +377,8 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
   const totalUnidades = todos.reduce((s, x) => s + (Number(x.stock) || 0), 0);
   const valorTotal = todos.reduce((s, x) => s + (Number(x.stock) || 0) * (Number(x.precio) || 0), 0);
   const agotados = todos.filter(x => (Number(x.stock) || 0) <= 0).length;
+  const esBajo = it => (Number(it.stock) || 0) <= umbralStock;   // repuesto por reponer
+  const repuestosBajos = repuestos.filter(esBajo).length;
 
   // Anotar una compra: sube el stock del artículo y deja el movimiento con su
   // fecha y costo, para llevar el control de lo que se va comprando.
@@ -407,6 +412,7 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
   const norm = t => (t ?? "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const q = norm(busqueda);
   const visibles = lista
+    .filter(it => !(soloBajos && sub === "repuestos") || esBajo(it))
     .filter(it => !q || norm(it.nombre).includes(q) || norm(it.codigo).includes(q) || norm(it.potencia).includes(q))
     .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" }));
   const guardar = () => {
@@ -433,9 +439,10 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
         {(sub === "modelos" || sub === "repuestos") && <Btn onClick={() => { setForm(sub === "modelos" ? { id: uid(), codigo: "", nombre: "", potencia: "", combustible: "Gasolina", precio: 0, stock: 0 } : { id: uid(), codigo: "", nombre: "", precio: 0, stock: 0 }); setModal(true); }} color={ac} small>+ Nuevo</Btn>}
         {sub === "kit" && <Btn onClick={() => setReponer(true)} color={ac} small>+ Reponer kit</Btn>}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-        {[["Unidades", totalUnidades, ac], ["Valor", usd(valorTotal), GREEN], ["Agotados", agotados, agotados ? RED : GREEN]].map(([t, v, col]) => (
-          <Card key={t} style={{ padding: "10px 12px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+        {[["Unidades", totalUnidades, ac, null], ["Valor", usd(valorTotal), GREEN, null], ["Agotados", agotados, agotados ? RED : GREEN, null],
+          [`Stock bajo (≤${umbralStock})`, repuestosBajos, repuestosBajos ? ORANGE : GREEN, () => { setSub("repuestos"); setSoloBajos(true); }]].map(([t, v, col, onClick]) => (
+          <Card key={t} onClick={onClick || undefined} style={{ padding: "10px 12px", cursor: onClick ? "pointer" : "default" }}>
             <p style={{ margin: 0, fontSize: 10, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase" }}>{t}</p>
             <p style={{ margin: "2px 0 0", fontSize: 17, fontWeight: 900, color: col }}>{v}</p>
           </Card>
@@ -455,6 +462,12 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
           ? <button onClick={() => setBusqueda("")} aria-label="Limpiar" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: TEXT_SUB, fontSize: 15, cursor: "pointer", padding: 4 }}>✕</button>
           : <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: TEXT_SUB, fontSize: 14, pointerEvents: "none" }}>🔍</span>}
       </div>
+      {sub === "repuestos" && (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 2px 12px", fontSize: 13, color: soloBajos ? ORANGE : TEXT_SUB, fontWeight: soloBajos ? 700 : 400, cursor: "pointer" }}>
+          <input type="checkbox" checked={soloBajos} onChange={e => setSoloBajos(e.target.checked)} />
+          Solo stock bajo (≤{umbralStock}){repuestosBajos > 0 ? ` · ${repuestosBajos}` : ""}
+        </label>
+      )}
       {busqueda && <p style={{ margin: "-6px 2px 12px", fontSize: 12, color: TEXT_SUB }}>{visibles.length} resultado{visibles.length === 1 ? "" : "s"}</p>}
 
       {visibles.length === 0 && (
@@ -463,7 +476,7 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
         </p>
       )}
       {visibles.map(item => (
-        <Card key={item.id}>
+        <Card key={item.id} style={sub === "repuestos" && esBajo(item) ? { borderLeft: `4px solid ${item.stock > 0 ? ORANGE : RED}` } : undefined}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
             {item.imagen && <img src={item.imagen} alt="" style={{ width: 56, height: 56, objectFit: "contain", borderRadius: 8, border: `1px solid ${BORDER}` }} />}
             <div style={{ flex: 1 }}>
@@ -472,7 +485,8 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
               <p style={{ margin: "0 0 6px", fontSize: 13, color: TEXT_SUB }}>Cód: {item.codigo}</p>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <span style={{ color: ac, fontWeight: 800, fontSize: 16 }}>{usd(item.precio)}</span>
-                <Badge text={`Stock: ${item.stock}`} color={item.stock > 0 ? GREEN : RED} />
+                <Badge text={`Stock: ${item.stock}`} color={item.stock <= 0 ? RED : (sub === "repuestos" && esBajo(item) ? ORANGE : GREEN)} />
+                {sub === "repuestos" && item.stock > 0 && esBajo(item) && <Badge text="⚠️ Reponer" color={ORANGE} />}
               </div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -702,6 +716,8 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, emp
             <Inp label="Teléfonos" value={borradorEmpresa.telefonos || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, telefonos: v }))} />
             <Inp label="Email" value={borradorEmpresa.email || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, email: v }))} />
             <Inp label="Web" value={borradorEmpresa.web || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, web: v }))} />
+            <div style={{ margin: "6px 0 4px", fontSize: 12, color: TEXT_SUB, fontWeight: 700 }}>AVISO DE STOCK BAJO</div>
+            <Inp label="Avisar cuando un repuesto quede en esta cantidad o menos" type="number" value={borradorEmpresa.stockMinimo ?? 3} onChange={v => setBorradorEmpresa(p => ({ ...p, stockMinimo: v }))} />
             <CampoImagen label="Logo" valor={borradorEmpresa.logo} preparar={prepararLogo} alto={70}
               onCambio={v => setBorradorEmpresa(p => ({ ...p, logo: v }))}
               ayuda="Sale en la cabecera de cada presupuesto impreso." />
@@ -776,7 +792,7 @@ function HojaNuevo({ onElegir, onCerrar }) {
 }
 
 // ── BIENVENIDA ────────────────────────────────────────────────────────────────
-function ModuloBienvenida({ setTab, stats, onNuevo }) {
+function ModuloBienvenida({ setTab, stats, onNuevo, onStockBajo }) {
   const secciones = TABS.map(t => ({ ...t, color: ACENTOS[t.id] }));
   return (
     <div>
@@ -814,6 +830,13 @@ function ModuloBienvenida({ setTab, stats, onNuevo }) {
             <span style={{ color, fontWeight: 900 }}>›</span>
           </Card>
         ))}
+
+      {stats.repuestosStockBajo > 0 && (
+        <Card onClick={onStockBajo || (() => setTab("inventario"))} style={{ background: ORANGE + "11", border: `1px solid ${ORANGE}44`, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: ORANGE }}>📦 {stats.repuestosStockBajo} repuesto{stats.repuestosStockBajo > 1 ? "s" : ""} con stock bajo</span>
+          <span style={{ color: ORANGE, fontWeight: 900 }}>›</span>
+        </Card>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 6 }}>
         {secciones.map(s => (
@@ -859,6 +882,9 @@ export default function App() {
   // Cotización que hay que abrir ya rellenada al llegar desde una inspección.
   const [cotizacionInicial, setCotizacionInicial] = useState(null);
   const empresa = empresaLista[0] || EMPRESA_POR_DEFECTO;
+  // Aviso de stock bajo: umbral configurable en Admin (por defecto, 3 o menos).
+  const umbralStock = Math.max(0, Number(empresa.stockMinimo ?? 3));
+  const [verBajos, setVerBajos] = useState(false);   // señal para abrir el inventario en los repuestos con poco stock
 
   // Entrada única para crear. En vez de un botón «+» distinto en cada módulo,
   // un solo «+ Nuevo» pregunta qué se va a registrar y abre el MISMO formulario
@@ -1299,6 +1325,7 @@ export default function App() {
     tareasAtrasadas: mias.filter(t => abierta(t) && t.fecha < hoy()).length,
     inspeccionesPorResolver: tareas.filter(t => t.tipo === "Inspección" && t.estado === "Completada" && !t.resultado).length,
     mantenimientosVencidos: tareas.filter(t => t.tipo === "Mantenimiento" && abierta(t) && t.fecha < hoy()).length,
+    repuestosStockBajo: esOficina ? repuestos.filter(r => (Number(r.stock) || 0) <= umbralStock).length : 0,
   };
 
   // En el iPhone, con la app instalada, la página ocupa también la franja de
@@ -1353,7 +1380,7 @@ export default function App() {
       <Cabecera />
 
       <div className="main-content" style={{ maxWidth: 760, margin: "0 auto" }}>
-        {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} onNuevo={() => setNuevoMenu(true)} /></>}
+        {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} onNuevo={() => setNuevoMenu(true)} onStockBajo={() => { setTab("inventario"); setVerBajos(true); }} /></>}
         {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} kit={kit} onResolverInspeccion={resolverInspeccion} onCerrarConVenta={registrarVentaAlCerrar} />}
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos}
@@ -1364,7 +1391,7 @@ export default function App() {
         {tab === "cotizaciones" && <ModuloCotizaciones cotizaciones={cotizaciones} setCotizaciones={setCotizaciones} ventas={ventas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} empresa={empresa} onAprobar={aprobarCotizacion} onEditarAprobada={actualizarTareaDeCotizacion}
                                      inicial={cotizacionInicial} onInicialUsado={() => setCotizacionInicial(null)} />}
         {tab === "ventas"       && <ModuloVentas ventas={ventas} setVentas={setVentas} clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos} garantias={garantias} setGarantias={setGarantias} empresa={empresa} onNuevaVenta={d => registrarVenta({ ...d, origen: "Directa" })} onEditarVenta={editarVenta} onEliminarVenta={eliminarVenta} abrirNuevo={abrirNuevo === "venta"} onNuevoListo={() => setAbrirNuevo(null)} />}
-        {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} movimientos={movimientos} setMovimientos={setMovimientos} kit={kit} setKit={setKit} usuario={sesion?.nombre || "Oficina"} />}
+        {tab === "inventario"   && <ModuloInventario inventario={inventario} setInventario={setInventario} repuestos={repuestos} setRepuestos={setRepuestos} movimientos={movimientos} setMovimientos={setMovimientos} kit={kit} setKit={setKit} usuario={sesion?.nombre || "Oficina"} umbralStock={umbralStock} verBajos={verBajos} onVerBajosListo={() => setVerBajos(false)} />}
         {tab === "garantias"    && <ModuloGarantias garantias={garantias} clientes={clientes} />}
         {tab === "admin"        && <ModuloAdmin tecnicos={tecnicos} setTecnicos={setTecnicos} exportarDatos={exportarDatos} restaurarDatos={restaurarDatos}
           empresa={empresa} setEmpresa={d => setEmpresaLista([d])} correo={sesion.correo} />}
