@@ -359,7 +359,7 @@ function ModalReponerKit({ repuestos, setRepuestos, kit, setKit, setMovimientos,
 }
 
 // ── INVENTARIO ────────────────────────────────────────────────────────────────
-function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, movimientos, setMovimientos, kit, setKit, usuario, umbralStock = 3, verBajos, onVerBajosListo }) {
+function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, movimientos, setMovimientos, kit, setKit, usuario, umbralStock = 1, verBajos, onVerBajosListo }) {
   const [sub, setSub] = useState("modelos");
   const [reponer, setReponer] = useState(false);
   const [modal, setModal] = useState(false);
@@ -717,7 +717,7 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, emp
             <Inp label="Email" value={borradorEmpresa.email || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, email: v }))} />
             <Inp label="Web" value={borradorEmpresa.web || ""} onChange={v => setBorradorEmpresa(p => ({ ...p, web: v }))} />
             <div style={{ margin: "6px 0 4px", fontSize: 12, color: TEXT_SUB, fontWeight: 700 }}>AVISO DE STOCK BAJO</div>
-            <Inp label="Avisar cuando un repuesto quede en esta cantidad o menos" type="number" value={borradorEmpresa.stockMinimo ?? 3} onChange={v => setBorradorEmpresa(p => ({ ...p, stockMinimo: v }))} />
+            <Inp label="Avisar cuando un repuesto quede en esta cantidad o menos" type="number" value={borradorEmpresa.stockMinimo ?? 1} onChange={v => setBorradorEmpresa(p => ({ ...p, stockMinimo: v }))} />
             <CampoImagen label="Logo" valor={borradorEmpresa.logo} preparar={prepararLogo} alto={70}
               onCambio={v => setBorradorEmpresa(p => ({ ...p, logo: v }))}
               ayuda="Sale en la cabecera de cada presupuesto impreso." />
@@ -882,8 +882,8 @@ export default function App() {
   // Cotización que hay que abrir ya rellenada al llegar desde una inspección.
   const [cotizacionInicial, setCotizacionInicial] = useState(null);
   const empresa = empresaLista[0] || EMPRESA_POR_DEFECTO;
-  // Aviso de stock bajo: umbral configurable en Admin (por defecto, 3 o menos).
-  const umbralStock = Math.max(0, Number(empresa.stockMinimo ?? 3));
+  // Aviso de stock bajo: umbral configurable en Admin (por defecto, 1 o menos).
+  const umbralStock = Math.max(0, Number(empresa.stockMinimo ?? 1));
   const [verBajos, setVerBajos] = useState(false);   // señal para abrir el inventario en los repuestos con poco stock
 
   // Entrada única para crear. En vez de un botón «+» distinto en cada módulo,
