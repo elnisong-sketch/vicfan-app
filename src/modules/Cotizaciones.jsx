@@ -46,8 +46,11 @@ const NOTAS_FRECUENTES = [
 export const SERVICIOS_CATALOGO = [
   { nombre: "Instalación", detalle: "", precio: 0 },
   { nombre: "Mano de obra", detalle: "", precio: 0 },
-  { nombre: "Suministro e instalación de acometida de gas bajo norma COVENIN", detalle: "Incluye regulación, arreglo mecánico de tubería y prueba", precio: 0 },
-  { nombre: "Suministro e instalación de acometida eléctrica", detalle: "Incluye cable de control, potencia y carga", precio: 0 },
+  { nombre: "Suministro e instalación de acometida eléctrica", detalle: "Incluye tubería, cable de control, potencia, red y carga", precio: 0 },
+  { nombre: "Suministro e instalación de acometida de gas bajo norma COVENIN 928:2019", detalle: "Incluye tubería, válvulas, regulación y prueba de hermeticidad", precio: 0 },
+  { nombre: "Suministro e instalación de tanque de gas GLP 120 galones", detalle: "Incluye transporte y llenado", precio: 0 },
+  { nombre: "Suministro e instalación de tanque de gas GLP 500 galones", detalle: "Incluye transporte y llenado", precio: 0 },
+  { nombre: "Suministro e instalación de batería para generador", detalle: "", precio: 0 },
   { nombre: "Instalación y puesta en marcha", detalle: "Incluye transporte y descarga", precio: 0 },
   { nombre: "Instalación eléctrica", detalle: "", precio: 150 },
   { nombre: "Cerco eléctrico", detalle: "", precio: 0 },
