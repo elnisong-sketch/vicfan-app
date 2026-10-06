@@ -739,7 +739,7 @@ function VistaSemana({ tareas, base, setBase, nombreCliente, abrir }) {
 }
 
 // ── MÓDULO PRINCIPAL ──────────────────────────────────────────────────────────
-export default function ModuloTareas({ tareas, setTareas, clientes, setClientes, tecnicos, sesion, kit = [], onResolverInspeccion, onCerrarConVenta }) {
+export default function ModuloTareas({ tareas, setTareas, clientes, setClientes, tecnicos, sesion, kit = [], onResolverInspeccion, onCerrarTarea }) {
   const [vista, setVista]         = useState("hoy");
   const [categoria, setCategoria] = useState("todas");
   const [baseSemana, setBaseSemana] = useState(hoy());
@@ -772,9 +772,11 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
   const iniciar = t => actualizar(t.id, x => registrar({ ...x, estado: "En proceso" }, "Iniciada", quienActua));
 
   const confirmarCierre = cierre => {
+    // La oficina decide qué pasa con el dinero: si la venta ligada aún no está
+    // cobrada, no deja cerrar; si no hay venta y hay costo, la crea.
+    const r = onCerrarTarea ? onCerrarTarea(cerrando, cierre) : { ok: true };
+    if (r && r.ok === false) { if (r.motivo) alert(r.motivo); return; }
     actualizar(cerrando.id, x => registrar({ ...x, estado: "Completada", cierre }, "Finalizada", cierre.tecnicoNombre));
-    // Si la oficina puso un costo final, ese cobro queda registrado como venta.
-    onCerrarConVenta?.(cerrando, cierre);
     setCerrando(null);
     setDetalle(null);
   };
