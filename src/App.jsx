@@ -371,6 +371,8 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
   const [entrada, setEntrada] = useState(null);        // { item, clase } al que se le añade stock
   const [entCant, setEntCant] = useState("");
   const [entCosto, setEntCosto] = useState("");
+  const [devolver, setDevolver] = useState(null);      // artículo del kit que se devuelve al inventario
+  const [devCant, setDevCant] = useState("");
   const [histFiltro, setHistFiltro] = useState("todo");
   const ac = ACENTOS.inventario;
   const todos = [...inventario, ...repuestos];
@@ -392,18 +394,22 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
     setEntrada(null);
   };
 
-  // Devolver un artículo del kit al inventario (corrección o fin de temporada).
-  const devolverDelKit = k => {
-    const n = Number(k.cantidad) || 0;
+  // Devolver al inventario una cantidad del kit (total o parcial). Corrección o
+  // fin de temporada: lo que vuelve queda disponible para venta o cotización.
+  const confirmarDevolucion = () => {
+    const k = devolver;
+    const enKit = Number(k.cantidad) || 0;
+    const n = Math.min(Math.max(0, Math.floor(Number(devCant) || 0)), enKit);
     if (n <= 0) return;
-    if (!confirm(`¿Devolver ${n} × ${k.nombre} del kit al inventario?`)) return;
     setRepuestos(p => p.some(r => r.id === k.id) ? p.map(r => r.id === k.id ? { ...r, stock: (Number(r.stock) || 0) + n } : r) : p);
-    setKit(p => p.filter(x => x.id !== k.id));
+    // Si se devuelve todo, el artículo sale del kit; si es parcial, queda el resto.
+    setKit(p => { const resto = enKit - n; return resto > 0 ? p.map(x => x.id === k.id ? { ...x, cantidad: resto } : x) : p.filter(x => x.id !== k.id); });
     const base = { articuloId: k.id, articuloNombre: k.nombre, clase: "repuesto", cantidad: n, quien: usuario || "Oficina", fecha: hoy(), creadoEn: new Date().toISOString() };
     setMovimientos(p => [...p,
       { id: uid(), tipo: "salida", origen: "Devuelto al inventario", ubicacion: "kit", ...base },
       { id: uid(), tipo: "entrada", origen: "Devuelto del kit de inspección", ubicacion: "inventario", ...base },
     ]);
+    setDevolver(null);
   };
   const lista = sub === "modelos" ? inventario : repuestos;
   const setLista = sub === "modelos" ? setInventario : setRepuestos;
@@ -546,7 +552,7 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
                 <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>🔩 {k.nombre}</p>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Badge text={`En kit: ${k.cantidad}`} color={(Number(k.cantidad) || 0) > 0 ? GREEN : RED} />
-                  <Btn onClick={() => devolverDelKit(k)} color={RED} outline small>↩︎ Devolver</Btn>
+                  <Btn onClick={() => { setDevCant(String(k.cantidad || "")); setDevolver(k); }} color={RED} outline small>↩︎ Devolver</Btn>
                 </div>
               </div>
             </Card>
@@ -575,6 +581,19 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
 
       {reponer && (
         <ModalReponerKit repuestos={repuestos} setRepuestos={setRepuestos} kit={kit} setKit={setKit} setMovimientos={setMovimientos} usuario={usuario} onCerrar={() => setReponer(false)} />
+      )}
+
+      {devolver && (
+        <Modal onClose={() => setDevolver(null)}>
+          <h3 style={{ margin: "0 0 6px", color: ac }}>↩︎ Devolver del kit</h3>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}>{devolver.nombre} · en el kit: {devolver.cantidad}</p>
+          <Inp label={`¿Cuántas unidades devuelves al inventario? (máx. ${devolver.cantidad})`} type="number" value={devCant} onChange={setDevCant} placeholder="0" />
+          <p style={{ margin: "-4px 2px 14px", fontSize: 12, color: TEXT_SUB }}>Vuelven al inventario y quedan disponibles para venta o cotización. Lo que no devuelvas sigue en el kit.</p>
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn onClick={confirmarDevolucion} color={ac} full disabled={!(Number(devCant) > 0)}>Devolver</Btn>
+            <Btn onClick={() => setDevolver(null)} color={TEXT_SUB} outline full>Cancelar</Btn>
+          </div>
+        </Modal>
       )}
 
       {entrada && (
