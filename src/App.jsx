@@ -485,7 +485,9 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
               <p style={{ margin: "0 0 6px", fontSize: 13, color: TEXT_SUB }}>Cód: {item.codigo}</p>
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <span style={{ color: ac, fontWeight: 800, fontSize: 16 }}>{usd(item.precio)}</span>
-                <Badge text={`Stock: ${item.stock}`} color={item.stock <= 0 ? RED : (sub === "repuestos" && esBajo(item) ? ORANGE : GREEN)} />
+                {(Number(item.stock) || 0) <= 0
+                  ? <Badge text="⛔ AGOTADO" color={RED} />
+                  : <Badge text={`Stock: ${item.stock}`} color={sub === "repuestos" && esBajo(item) ? ORANGE : GREEN} />}
                 {sub === "repuestos" && item.stock > 0 && esBajo(item) && <Badge text="⚠️ Reponer" color={ORANGE} />}
               </div>
             </div>
