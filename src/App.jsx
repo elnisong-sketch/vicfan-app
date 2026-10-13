@@ -1097,24 +1097,19 @@ export default function App() {
     registrarVenta({ clienteId: tarea.clienteId, items, total, origen: `Mantenimiento${cliente ? " · " + cliente.nombre : ""}`, mantenimientoId: tarea.id, nota: tarea.notaVenta || "" });
   };
 
-  // Qué pasa con el dinero al cerrar una tarea. Devuelve { ok, motivo }:
+  // Qué pasa con el dinero al cerrar una tarea. Devuelve { ok }:
   //  • Si la tarea YA tiene su venta (de una cotización, un proyecto o un
-  //    mantenimiento con artículos): NO se crea otra (así no se duplica). Y si
-  //    esa venta aún no está cobrada, NO deja cerrar: primero hay que cobrarla.
+  //    mantenimiento con artículos): NO se crea otra (así no se duplica). Se
+  //    puede cerrar aunque la venta aún no esté cobrada.
   //  • Si la tarea NO tiene venta y se puso un costo final (p. ej. un
   //    mantenimiento directo): esa es su única venta y se crea al cerrar.
   const alCerrarTarea = (tarea, cierre) => {
-    const ligada = ventas.find(v => v.estado !== "Cancelada" && (
+    const ligada = ventas.some(v => v.estado !== "Cancelada" && (
       v.mantenimientoId === tarea.id ||
       (tarea.proyectoId && v.proyectoId === tarea.proyectoId) ||
       (tarea.cotizacionId && v.cotizacionId === tarea.cotizacionId)
     ));
-    if (ligada) {
-      if (ligada.estado !== "Cobrada") {
-        return { ok: false, motivo: `Esta tarea tiene una venta pendiente por cobrar (Nº ${ligada.numero || "—"} · ${usd(ligada.total)}).\n\nMárcala como cobrada en Ventas antes de cerrar la tarea.` };
-      }
-      return { ok: true };   // ya cobrada: se cierra sin crear otra venta
-    }
+    if (ligada) return { ok: true };   // ya tiene venta: se cierra sin crear otra
     // Sin venta ligada: si hay costo final, esa es su única venta.
     const costo = Number(cierre?.costoFinal) || 0;
     if (costo > 0 && !tarea.proyectoId) {
