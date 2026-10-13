@@ -1,5 +1,5 @@
 import { doc, getDoc, deleteDoc } from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getBlob, deleteObject } from "firebase/storage";
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "./firebase";
 
 // Fotos de las tareas.
@@ -204,26 +204,22 @@ export async function subirPendientes() {
  * Devuelve el blob de una foto. Si este dispositivo no la tiene (la tomó otro),
  * la baja de Firestore y la deja cacheada.
  */
+// Devuelve una URL lista para poner en <img src>. No baja el archivo con
+// fetch/getBlob (eso exigiría configurar CORS en el bucket): usa la URL de
+// descarga de Storage, que una <img> pinta sin problema de origen.
+//   · foto de ESTE dispositivo → objectURL de su copia local
+//   · foto nueva (otro técnico) → URL de descarga de Cloud Storage
+//   · foto antigua → su propio dataURL base64 (guardado en Firestore)
 export async function asegurarFoto(id) {
   const local = await leerLocal(id).catch(() => null);
-  if (local?.blob) return local.blob;
+  if (local?.blob) return URL.createObjectURL(local.blob);
 
-  // 1) Foto nueva: está en Cloud Storage.
-  try {
-    const blob = await getBlob(rutaFoto(id));
-    await guardarLocal({ id, blob, bytes: blob.size, creadaEn: new Date().toISOString(), subida: true }).catch(() => {});
-    return blob;
-  } catch { /* no está en Storage; puede ser una foto antigua en Firestore */ }
+  try { return await getDownloadURL(rutaFoto(id)); }
+  catch { /* no está en Storage; puede ser una foto antigua en Firestore */ }
 
-  // 2) Foto antigua (antes de la migración): base64 dentro de Firestore.
   try {
     const snap = await getDoc(doc(db, COLECCION, id));
-    if (snap.exists()) {
-      const d = snap.data();
-      const blob = await dataUrlABlob(d.datos);
-      await guardarLocal({ id, tareaId: d.tareaId, tipo: d.tipo, autor: d.autor || "—", blob, bytes: blob.size, creadaEn: d.creadaEn, subida: true }).catch(() => {});
-      return blob;
-    }
+    if (snap.exists()) return snap.data().datos;   // dataURL base64, válido en <img>
   } catch { /* sin conexión o sin permiso */ }
   return null;
 }

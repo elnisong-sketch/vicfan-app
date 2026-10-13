@@ -99,11 +99,10 @@ function Fotos({ tareaId, fotos, onCambio, soloLectura, autor }) {
     const creadas = [];
     (async () => {
       for (const f of fotos) {
-        const blob = await asegurarFoto(f.id).catch(() => null);
+        const url = await asegurarFoto(f.id).catch(() => null);
         if (!vivo) return;
-        if (!blob) continue;
-        const url = URL.createObjectURL(blob);
-        creadas.push(url);
+        if (!url) continue;
+        if (url.startsWith("blob:")) creadas.push(url);   // solo los objectURL se liberan
         setUrls(prev => ({ ...prev, [f.id]: url }));
       }
     })();
