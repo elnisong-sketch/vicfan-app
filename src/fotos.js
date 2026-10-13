@@ -1,11 +1,14 @@
-import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { doc, getDoc, deleteDoc } from "firebase/firestore";
+import { ref as storageRef, uploadBytes, getBlob, deleteObject } from "firebase/storage";
+import { db, storage } from "./firebase";
 
 // Fotos de las tareas.
 //
-// Cada foto es SU PROPIO documento en Firestore (`vicfan_fotos/{id}`), no un
-// campo dentro de la tarea. Una tarea con ocho fotos superaría el límite de
-// 1 MB por documento; separadas, cada una ronda los 150-200 KB y sobra sitio.
+// La foto se sube a Cloud Storage (`fotos/{id}`), NO a Firestore. En Firestore
+// cada documento tope en 1 MB (una foto de Android se pasa) e infla la base
+// (plan gratuito: 1 GB). Storage está hecho para archivos: sin ese límite y la
+// subida es fiable. Las fotos ANTIGUAS, que sí quedaron en Firestore como
+// base64, se siguen leyendo (compatibilidad) hasta que se reemplacen.
 //
 // El dispositivo guarda además una copia en IndexedDB, que hace dos papeles:
 //   · cola de subida — el técnico fotografía sin señal y se envía al volver
@@ -18,7 +21,20 @@ import { db } from "./firebase";
 const DB_NOMBRE = "vicfan_fotos";
 const ALMACEN = "fotos";
 const VERSION = 1;
-const COLECCION = "vicfan_fotos";
+const COLECCION = "vicfan_fotos";   // solo para leer fotos antiguas (base64)
+const rutaFoto = id => storageRef(storage, `fotos/${id}`);
+
+// Traduce el fallo de subida a algo que el técnico entienda, para que el aviso
+// no sea solo "no se subió" sino el motivo real.
+function motivoDeFallo(e) {
+  const c = (e?.code || e?.message || "").toString().toLowerCase();
+  if (c.includes("unauthorized") || c.includes("permission")) return "Sin permiso para subir (revisar reglas de Storage).";
+  if (c.includes("unauthenticated")) return "Sesión caducada. Vuelve a entrar.";
+  if (c.includes("quota")) return "Almacenamiento lleno.";
+  if (c.includes("retry") || c.includes("network") || c.includes("canceled")) return "Sin conexión estable. Reintenta con señal.";
+  if (c.includes("object-not-found") || c.includes("bucket-not-found") || c.includes("project-not-found") || c.includes("unknown")) return "Storage no disponible (¿sin habilitar?).";
+  return "No se pudo subir la foto.";
+}
 
 function abrirDB() {
   return new Promise((resolve, reject) => {
@@ -154,14 +170,14 @@ export async function guardarFoto({ id, tareaId, tipo, autor, file }) {
 }
 
 async function subirFoto(registro) {
-  const datos = await blobADataUrl(registro.blob);
-  await setDoc(doc(db, COLECCION, registro.id), {
-    id: registro.id,
-    tareaId: registro.tareaId,
-    tipo: registro.tipo,
-    autor: registro.autor || "—",
-    datos,
-    creadaEn: registro.creadaEn,
+  await uploadBytes(rutaFoto(registro.id), registro.blob, {
+    contentType: registro.blob?.type || "image/jpeg",
+    customMetadata: {
+      tareaId: registro.tareaId || "",
+      tipo: registro.tipo || "",
+      autor: registro.autor || "—",
+      creadaEn: registro.creadaEn || "",
+    },
   });
   await guardarLocal({ ...registro, subida: true });
 }
@@ -174,11 +190,12 @@ async function subirFoto(registro) {
 export async function subirPendientes() {
   const cola = await pendientesDeSubir();
   let subidas = 0;
+  let fallo = null;
   for (const registro of cola) {
-    try { await subirFoto(registro); subidas++; } catch { /* sigue en cola */ }
+    try { await subirFoto(registro); subidas++; } catch (e) { fallo = e; /* sigue en cola */ }
   }
   const restantes = await pendientesDeSubir();
-  return { subidas, pendientes: restantes.length };
+  return { subidas, pendientes: restantes.length, error: restantes.length && fallo ? motivoDeFallo(fallo) : null };
 }
 
 // ── LEER ──────────────────────────────────────────────────────────────────────
@@ -191,14 +208,24 @@ export async function asegurarFoto(id) {
   const local = await leerLocal(id).catch(() => null);
   if (local?.blob) return local.blob;
 
-  const snap = await getDoc(doc(db, COLECCION, id));
-  if (!snap.exists()) return null;
+  // 1) Foto nueva: está en Cloud Storage.
+  try {
+    const blob = await getBlob(rutaFoto(id));
+    await guardarLocal({ id, blob, bytes: blob.size, creadaEn: new Date().toISOString(), subida: true }).catch(() => {});
+    return blob;
+  } catch { /* no está en Storage; puede ser una foto antigua en Firestore */ }
 
-  const d = snap.data();
-  const blob = await dataUrlABlob(d.datos);
-  await guardarLocal({ id, tareaId: d.tareaId, tipo: d.tipo, autor: d.autor || "—", blob, bytes: blob.size, creadaEn: d.creadaEn, subida: true })
-    .catch(() => {});
-  return blob;
+  // 2) Foto antigua (antes de la migración): base64 dentro de Firestore.
+  try {
+    const snap = await getDoc(doc(db, COLECCION, id));
+    if (snap.exists()) {
+      const d = snap.data();
+      const blob = await dataUrlABlob(d.datos);
+      await guardarLocal({ id, tareaId: d.tareaId, tipo: d.tipo, autor: d.autor || "—", blob, bytes: blob.size, creadaEn: d.creadaEn, subida: true }).catch(() => {});
+      return blob;
+    }
+  } catch { /* sin conexión o sin permiso */ }
+  return null;
 }
 
 /** Cuántas fotos de esta lista siguen sin subir en este dispositivo. */
@@ -230,5 +257,6 @@ export async function pendientesDeSubir() {
 
 export async function borrarFoto(id) {
   await conAlmacen("readwrite", store => { store.delete(id); return {}; });
-  await deleteDoc(doc(db, COLECCION, id)).catch(() => {});
+  await deleteObject(rutaFoto(id)).catch(() => {});       // foto nueva (Storage)
+  await deleteDoc(doc(db, COLECCION, id)).catch(() => {}); // foto antigua (Firestore)
 }

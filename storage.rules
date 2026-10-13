@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// Reglas de Cloud Storage para las fotos de las tareas.
+// Las fotos viven en `fotos/{id}`. Cualquier usuario autenticado (oficina o
+// técnico) puede verlas y subirlas; se limita el tamaño y el tipo para que no
+// se suba cualquier archivo. Lo que protege es estar autenticado, igual que en
+// Firestore: la clave del proyecto no es secreta.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /fotos/{id} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 12 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // Todo lo demás, denegado.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

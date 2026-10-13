@@ -36,10 +36,12 @@ const TABS = [
 function AvisoPendientes() {
   const [n, setN] = useState(0);
   const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState(null);
   const revisar = () => contarTodasPendientes().then(setN).catch(() => {});
   const subir = async () => {
     setSubiendo(true);
-    await subirPendientes().catch(() => {});
+    const r = await subirPendientes().catch(() => ({ error: "No se pudo subir." }));
+    setError(r?.error || null);
     await revisar();
     setSubiendo(false);
   };
@@ -53,14 +55,17 @@ function AvisoPendientes() {
   }, []);
   if (n === 0 && !subiendo) return null;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, background: ORANGE, color: "#fff", padding: "9px 16px" }}>
-      <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>
-        {subiendo ? "↑ Subiendo fotos…" : `📤 ${n} foto${n === 1 ? "" : "s"} pendiente${n === 1 ? "" : "s"} de subir`}
-      </span>
-      <button onClick={subir} disabled={subiendo}
-        style={{ background: "#ffffff22", border: "1px solid #ffffff66", borderRadius: 8, color: "#fff", padding: "6px 12px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-        {subiendo ? "…" : "Subir ahora"}
-      </button>
+    <div style={{ background: ORANGE, color: "#fff", padding: "9px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>
+          {subiendo ? "↑ Subiendo fotos…" : `📤 ${n} foto${n === 1 ? "" : "s"} pendiente${n === 1 ? "" : "s"} de subir`}
+        </span>
+        <button onClick={subir} disabled={subiendo}
+          style={{ background: "#ffffff22", border: "1px solid #ffffff66", borderRadius: 8, color: "#fff", padding: "6px 12px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+          {subiendo ? "…" : "Subir ahora"}
+        </button>
+      </div>
+      {error && !subiendo && <p style={{ margin: "6px 0 0", fontSize: 12, fontWeight: 600, color: "#fff" }}>⚠️ {error}</p>}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // Proyecto propio de VICFAN, separado del de Don Pepe a propósito: cuota,
 // reglas de seguridad y plan de facturación son por proyecto, así que un
@@ -29,3 +30,8 @@ export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 });
+
+// Almacenamiento de archivos (fotos). Las fotos NO van dentro de Firestore
+// (donde cada documento tope en 1 MB e inflan la base), sino en Cloud Storage,
+// que está hecho para archivos: sin límite por foto y subida más fiable.
+export const storage = getStorage(app);
