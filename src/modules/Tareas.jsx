@@ -11,7 +11,7 @@ import { ModalInspeccion, SelectorCliente } from "./Inspeccion.jsx";
 const ac = ACENTOS.tareas;
 
 export const TIPOS_TAREA = ["Instalación", "Mantenimiento", "Reparación", "Garantía", "Inspección"];
-const TIPO_ICONO = { "Instalación": "🔧", "Mantenimiento": "🔩", "Reparación": "🛠️", "Garantía": "🛡️", "Inspección": "🔍" };
+const TIPO_ICONO = { "Instalación": "🔧", "Mantenimiento": "🔩", "Reparación": "🛠️", "Garantía": "🛡️", "Inspección": "🔍", "Interna": "🧹" };
 const TIPOS_FOTO = [
   { id: "antes",   label: "Antes" },
   { id: "despues", label: "Después" },
@@ -200,9 +200,9 @@ function TarjetaTarea({ tarea, nombreCliente, esTecnico, onAbrir, onIniciar, onC
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3, flexWrap: "wrap" }}>
             <span style={{ fontWeight: 800, fontSize: compacta ? 13 : 15 }}>🕐 {tarea.hora}</span>
-            <span style={{ fontSize: compacta ? 13 : 15, fontWeight: 700 }}>{TIPO_ICONO[tarea.tipo]} {nombreCliente}</span>
+            <span style={{ fontSize: compacta ? 13 : 15, fontWeight: 700 }}>{TIPO_ICONO[tarea.tipo]} {tarea.tipo === "Interna" ? (tarea.descripcion?.trim() || "Tarea interna") : nombreCliente}</span>
           </div>
-          <p style={{ margin: "0 0 3px", fontSize: 13, color: TEXT_SUB }}>{tarea.tipo}{tarea.modelo ? ` · ${tarea.modelo}` : ""}</p>
+          {tarea.tipo !== "Interna" && <p style={{ margin: "0 0 3px", fontSize: 13, color: TEXT_SUB }}>{tarea.tipo}{tarea.modelo ? ` · ${tarea.modelo}` : ""}</p>}
           {tarea.proyectoNombre && <p style={{ margin: "0 0 3px", fontSize: 12, color: ACENTOS.operaciones, fontWeight: 700 }}>🏗️ {tarea.proyectoNombre}</p>}
           {tarea.direccion && <p style={{ margin: "0 0 3px", fontSize: 12, color: TEXT_SUB }}>📍 {tarea.direccion}</p>}
           {/* Las tareas son del equipo, no de una persona. Los nombres de los
@@ -251,22 +251,29 @@ function ModalTarea({ form, setForm, clientes, onCrearCliente, onGuardar, onCerr
     setForm(f => ({ ...f, clienteId: v, direccion: f.direccion || c?.direccion || "" }));
   };
 
+  // Una tarea interna (lavar la furgoneta, traer el desayuno…) no es una visita
+  // a un cliente: sin cliente, sin dirección, sin equipo. Solo qué hay que hacer.
+  const esInterna = form.tipo === "Interna";
   return (
     <Modal onClose={onCerrar}>
-      <h3 style={{ margin: "0 0 16px", color: ac }}>{form.creadaEn && form.historial?.length ? "Editar tarea" : "Nueva tarea"}</h3>
+      <h3 style={{ margin: "0 0 16px", color: ac }}>{form.creadaEn && form.historial?.length ? (esInterna ? "Editar tarea interna" : "Editar tarea") : (esInterna ? "🧹 Nueva tarea interna" : "Nueva tarea")}</h3>
 
-      <Sel label="Tipo de tarea" value={form.tipo} onChange={v => set("tipo", v)} options={TIPOS_TAREA.map(t => ({ value: t, label: `${TIPO_ICONO[t]} ${t}` }))} />
-      {form.tipo === "Inspección" && (
-        <Sel label="Clase de inspección" value={form.origen || ORIGENES_INSPECCION[0]} onChange={v => set("origen", v)}
-          options={ORIGENES_INSPECCION.map(o => ({ value: o, label: ETIQUETA_ORIGEN[o] }))} />
-      )}
-      <SelectorCliente clientes={clientes} valor={form.clienteId} onCambio={elegirCliente} onCrear={onCrearCliente} />
+      {!esInterna && <>
+        <Sel label="Tipo de tarea" value={form.tipo} onChange={v => set("tipo", v)} options={TIPOS_TAREA.map(t => ({ value: t, label: `${TIPO_ICONO[t]} ${t}` }))} />
+        {form.tipo === "Inspección" && (
+          <Sel label="Clase de inspección" value={form.origen || ORIGENES_INSPECCION[0]} onChange={v => set("origen", v)}
+            options={ORIGENES_INSPECCION.map(o => ({ value: o, label: ETIQUETA_ORIGEN[o] }))} />
+        )}
+        <SelectorCliente clientes={clientes} valor={form.clienteId} onCambio={elegirCliente} onCrear={onCrearCliente} />
+      </>}
+
+      {esInterna && <Area label="¿Qué hay que hacer?" value={form.descripcion} onChange={v => set("descripcion", v)} placeholder="Lavar la furgoneta, traer el desayuno…" />}
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10 }}>
         <Inp label="Fecha" type="date" value={form.fecha} onChange={v => set("fecha", v)} />
         <Inp label="Hora" type="time" value={form.hora} onChange={v => set("hora", v)} />
       </div>
-      <Inp label="Duración (días)" type="number" value={form.duracionDias ?? ""} onChange={v => set("duracionDias", v)} />
+      {!esInterna && <Inp label="Duración (días)" type="number" value={form.duracionDias ?? ""} onChange={v => set("duracionDias", v)} />}
       <Etiqueta>Prioridad</Etiqueta>
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {["Normal", "Alta", "Urgente"].map(p => {
@@ -281,13 +288,15 @@ function ModalTarea({ form, setForm, clientes, onCrearCliente, onGuardar, onCerr
         })}
       </div>
 
-      <Inp label="Equipo / modelo" value={form.modelo} onChange={v => set("modelo", v)} placeholder="GENERAC GP5500" />
-      <Inp label="Dirección" value={form.direccion} onChange={v => set("direccion", v)} placeholder={cliente?.direccion || "Dirección de la visita"} />
-      <Area label="Qué hay que hacer" value={form.descripcion} onChange={v => set("descripcion", v)} placeholder="Instrucciones para el técnico…" />
-      <Inp label="Costo estimado ($)" type="number" value={form.costo ?? ""} onChange={v => set("costo", v)} />
+      {!esInterna && <>
+        <Inp label="Equipo / modelo" value={form.modelo} onChange={v => set("modelo", v)} placeholder="GENERAC GP5500" />
+        <Inp label="Dirección" value={form.direccion} onChange={v => set("direccion", v)} placeholder={cliente?.direccion || "Dirección de la visita"} />
+        <Area label="Qué hay que hacer" value={form.descripcion} onChange={v => set("descripcion", v)} placeholder="Instrucciones para el técnico…" />
+        <Inp label="Costo estimado ($)" type="number" value={form.costo ?? ""} onChange={v => set("costo", v)} />
+      </>}
 
       <div style={{ display: "flex", gap: 10 }}>
-        <Btn onClick={onGuardar} color={ac} full disabled={!form.clienteId}>Guardar</Btn>
+        <Btn onClick={onGuardar} color={ac} full disabled={esInterna ? !form.descripcion?.trim() : !form.clienteId}>Guardar</Btn>
         <Btn onClick={onCerrar} color={TEXT_SUB} outline full>Cancelar</Btn>
       </div>
     </Modal>
@@ -547,7 +556,7 @@ function ModalDetalle({ tarea, nombreCliente, sesion, kit = [], onMaterialKit, o
   return (
     <Modal onClose={cerrarGuardando}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-        <h3 style={{ margin: 0, color: ac }}>{TIPO_ICONO[tarea.tipo]} {nombreCliente}</h3>
+        <h3 style={{ margin: 0, color: ac }}>{TIPO_ICONO[tarea.tipo]} {tarea.tipo === "Interna" ? (tarea.descripcion?.trim() || "Tarea interna") : nombreCliente}</h3>
         <Badge text={tarea.estado} color={ESTADO_COLOR[tarea.estado] || TEXT_SUB} />
       </div>
       <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}>
@@ -725,7 +734,7 @@ function VistaSemana({ tareas, base, setBase, nombreCliente, abrir }) {
               <div key={t.id} onClick={() => abrir(t)} style={{ display: "flex", alignItems: "center", gap: 8, background: BG_CARD, border: `1px solid ${BORDER}`, borderLeft: `4px solid ${ESTADO_COLOR[t.estado] || TEXT_SUB}`, borderRadius: 10, padding: "9px 12px", marginBottom: 6, cursor: "pointer" }}>
                 <span style={{ fontWeight: 800, fontSize: 13, minWidth: 44 }}>{t.hora}</span>
                 <span style={{ fontSize: 13, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {TIPO_ICONO[t.tipo]} {nombreCliente(t.clienteId)}
+                  {TIPO_ICONO[t.tipo]} {t.tipo === "Interna" ? (t.descripcion?.trim() || "Tarea interna") : nombreCliente(t.clienteId)}
                 </span>
                 {estaAtrasada(t) && <Badge text="!" color={RED} small />}
               </div>
@@ -746,6 +755,7 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
   const [form, setForm]           = useState(null);
   const [cerrando, setCerrando]   = useState(null);
   const [inspeccion, setInspeccion] = useState(false);
+  const [menuNueva, setMenuNueva] = useState(false);   // chooser de "+ Nueva": ¿visita técnica o interna?
 
   const esTecnico = sesion?.rol === "tecnico";
   const quienActua = sesion?.nombre || "Oficina";
@@ -841,7 +851,8 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
   }, "Reabierta", quienActua));
 
   const guardar = () => {
-    if (!form.clienteId) return;
+    const interna = form.tipo === "Interna";
+    if (interna ? !form.descripcion?.trim() : !form.clienteId) return;
     const limpio = { ...form, duracionDias: Math.max(1, Number(form.duracionDias) || 1), costo: Number(form.costo) || 0 };
     setTareas(p => {
       const existe = p.find(x => x.id === limpio.id);
@@ -851,10 +862,9 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
     setForm(null);
   };
 
-  const nueva = () => setForm({
-    ...tareaVacia(clientes[0]?.id),
-    fecha: vista === "semana" ? baseSemana : hoy(),
-  });
+  const nueva = () => { setMenuNueva(false); setForm({ ...tareaVacia(clientes[0]?.id), fecha: vista === "semana" ? baseSemana : hoy() }); };
+  // Tarea interna del equipo (sin cliente ni visita): lavar la furgoneta, etc.
+  const nuevaInterna = () => { setMenuNueva(false); setForm({ ...tareaVacia(""), tipo: "Interna", duracionDias: 1, fecha: vista === "semana" ? baseSemana : hoy() }); };
 
   const tarjeta = t => (
     <TarjetaTarea key={t.id} tarea={t} esTecnico={esTecnico}
@@ -873,9 +883,26 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
             puede abrir también un técnico: las encuentra él en la calle. */}
         <div style={{ display: "flex", gap: 8 }}>
           <Btn onClick={() => setInspeccion(true)} color={ACENTOS.operaciones} small>+ Inspección</Btn>
-          {!esTecnico && <Btn onClick={nueva} color={ac} small>+ Nueva</Btn>}
+          {!esTecnico && <Btn onClick={() => setMenuNueva(true)} color={ac} small>+ Nueva</Btn>}
         </div>
       </div>
+
+      {menuNueva && (
+        <Modal onClose={() => setMenuNueva(false)}>
+          <h3 style={{ margin: "0 0 4px", color: ac }}>Nueva tarea</h3>
+          <p style={{ margin: "0 0 16px", fontSize: 13.5, color: TEXT_SUB }}>¿Requiere visita técnica (ir donde un cliente)?</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button type="button" onClick={nueva} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", background: BG_CARD, border: `1px solid ${BORDER}`, borderLeft: `4px solid ${ac}`, borderRadius: 12, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit" }}>
+              <span style={{ fontSize: 22 }}>🔧</span>
+              <span><span style={{ display: "block", fontSize: 15, fontWeight: 800 }}>Sí — visita a un cliente</span><span style={{ display: "block", fontSize: 12.5, color: TEXT_SUB }}>Instalación, mantenimiento, reparación…</span></span>
+            </button>
+            <button type="button" onClick={nuevaInterna} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", background: BG_CARD, border: `1px solid ${BORDER}`, borderLeft: `4px solid ${TEXT_SUB}`, borderRadius: 12, padding: "12px 14px", cursor: "pointer", fontFamily: "inherit" }}>
+              <span style={{ fontSize: 22 }}>🧹</span>
+              <span><span style={{ display: "block", fontSize: 15, fontWeight: 800 }}>No — tarea interna</span><span style={{ display: "block", fontSize: 12.5, color: TEXT_SUB }}>Del equipo: lavar la furgoneta, traer el desayuno…</span></span>
+            </button>
+          </div>
+        </Modal>
+      )}
 
       <Chips value={vista} onChange={setVista} color={ac} opciones={[
         { value: "hoy",    label: `Hoy${deHoy.length ? ` (${deHoy.length})` : ""}` },
