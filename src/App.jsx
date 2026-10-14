@@ -1132,6 +1132,7 @@ export default function App() {
   const alCerrarTarea = (tarea, cierre) => {
     const ligada = ventas.some(v => v.estado !== "Cancelada" && (
       v.mantenimientoId === tarea.id ||
+      (tarea.ventaId && v.id === tarea.ventaId) ||
       (tarea.proyectoId && v.proyectoId === tarea.proyectoId) ||
       (tarea.cotizacionId && v.cotizacionId === tarea.cotizacionId)
     ));
@@ -1416,7 +1417,7 @@ export default function App() {
 
       <div className="main-content" style={{ maxWidth: 760, margin: "0 auto" }}>
         {tab === "inicio"       && <><AvisoInstalar /><ModuloBienvenida setTab={setTab} stats={stats} onNuevo={() => setNuevoMenu(true)} onStockBajo={() => { setTab("inventario"); setVerBajos(true); }} /></>}
-        {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} kit={kit} onResolverInspeccion={resolverInspeccion} onCerrarTarea={alCerrarTarea} />}
+        {tab === "tareas"       && <ModuloTareas tareas={tareas} setTareas={setTareas} clientes={clientes} setClientes={setClientes} tecnicos={tecnicos} sesion={sesion} kit={kit} ventas={ventas} onResolverInspeccion={resolverInspeccion} onCerrarTarea={alCerrarTarea} />}
         {tab === "operaciones"  && <ModuloOperaciones proyectos={proyectos} setProyectos={setProyectos} tareas={tareas} setTareas={setTareas}
                                      clientes={clientes} setClientes={setClientes} inventario={inventario} repuestos={repuestos}
                                      garantias={garantias} setGarantias={setGarantias}

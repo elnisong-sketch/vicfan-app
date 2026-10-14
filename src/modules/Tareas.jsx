@@ -747,7 +747,7 @@ function VistaSemana({ tareas, base, setBase, nombreCliente, abrir }) {
 }
 
 // ── MÓDULO PRINCIPAL ──────────────────────────────────────────────────────────
-export default function ModuloTareas({ tareas, setTareas, clientes, setClientes, tecnicos, sesion, kit = [], onResolverInspeccion, onCerrarTarea }) {
+export default function ModuloTareas({ tareas, setTareas, clientes, setClientes, tecnicos, sesion, kit = [], ventas = [], onResolverInspeccion, onCerrarTarea }) {
   const [vista, setVista]         = useState("hoy");
   const [categoria, setCategoria] = useState("todas");
   const [baseSemana, setBaseSemana] = useState(hoy());
@@ -756,6 +756,7 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
   const [cerrando, setCerrando]   = useState(null);
   const [inspeccion, setInspeccion] = useState(false);
   const [menuNueva, setMenuNueva] = useState(false);   // chooser de "+ Nueva": ¿visita técnica o interna?
+  const [menuAPartir, setMenuAPartir] = useState(false);   // elegir una venta para crearle tarea
 
   const esTecnico = sesion?.rol === "tecnico";
   const quienActua = sesion?.nombre || "Oficina";
@@ -866,6 +867,29 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
   // Tarea interna del equipo (sin cliente ni visita): lavar la furgoneta, etc.
   const nuevaInterna = () => { setMenuNueva(false); setForm({ ...tareaVacia(""), tipo: "Interna", duracionDias: 1, fecha: vista === "semana" ? baseSemana : hoy() }); };
 
+  // "A partir de…": ventas que todavía no tienen una tarea enlazada. Como toda
+  // cotización/mantenimiento/proyecto genera su venta, basta mirar las ventas;
+  // las que no crearon tarea (sobre todo las directas) son las "huérfanas".
+  const ventaTieneTarea = v => tareas.some(t =>
+    t.ventaId === v.id ||
+    (v.mantenimientoId && t.id === v.mantenimientoId) ||
+    (v.cotizacionId && t.cotizacionId === v.cotizacionId) ||
+    (v.proyectoId && t.proyectoId === v.proyectoId)
+  );
+  const ventasSinTarea = ventas.filter(v => v.estado !== "Cancelada" && !ventaTieneTarea(v));
+  const nuevaAPartir = v => {
+    setMenuAPartir(false);
+    const cliente = clientes.find(c => c.id === v.clienteId);
+    setForm({
+      ...tareaVacia(v.clienteId),
+      ventaId: v.id,                                   // enlace con la venta (no duplica al cerrar)
+      direccion: cliente?.direccion || "",
+      modelo: (v.items || []).find(i => i.modeloId)?.nombre || "",
+      descripcion: v.nota || "",
+      fecha: vista === "semana" ? baseSemana : hoy(),
+    });
+  };
+
   const tarjeta = t => (
     <TarjetaTarea key={t.id} tarea={t} esTecnico={esTecnico}
       nombreCliente={nombreCliente(t.clienteId)}
@@ -881,8 +905,9 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
         <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>{esTecnico ? "📅 Mi día" : "📅 Tareas"}</h2>
         {/* Las tareas en general las crea la oficina. Las inspecciones las
             puede abrir también un técnico: las encuentra él en la calle. */}
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <Btn onClick={() => setInspeccion(true)} color={ACENTOS.operaciones} small>+ Inspección</Btn>
+          {!esTecnico && <Btn onClick={() => setMenuAPartir(true)} color={ac} outline small>A partir de…</Btn>}
           {!esTecnico && <Btn onClick={() => setMenuNueva(true)} color={ac} small>+ Nueva</Btn>}
         </div>
       </div>
@@ -957,6 +982,26 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
         visibles.length > 0
           ? [...visibles].sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora)).map(tarjeta)
           : vacio("Todavía no hay tareas registradas")
+      )}
+
+      {menuAPartir && (
+        <Modal onClose={() => setMenuAPartir(false)}>
+          <h3 style={{ margin: "0 0 4px", color: ac }}>A partir de una venta</h3>
+          <p style={{ margin: "0 0 14px", fontSize: 13, color: TEXT_SUB }}>Elige una venta sin tarea y se le crea una (ya enlazada, sin duplicar el cobro).</p>
+          {ventasSinTarea.length === 0 && <p style={{ color: TEXT_SUB, textAlign: "center", padding: "18px 0", fontSize: 14 }}>Todas las ventas ya tienen su tarea.</p>}
+          <div style={{ maxHeight: 360, overflowY: "auto" }}>
+            {[...ventasSinTarea].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || "")).map(v => (
+              <button key={v.id} type="button" onClick={() => nuevaAPartir(v)}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "10px 12px", marginBottom: 6, cursor: "pointer", fontFamily: "inherit" }}>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 14, fontWeight: 700 }}>💰 {nombreCliente(v.clienteId)}</span>
+                  <span style={{ display: "block", fontSize: 12, color: TEXT_SUB, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.numero ? `Nº ${v.numero} · ` : ""}{v.origen}{v.fecha ? ` · ${v.fecha}` : ""}</span>
+                </span>
+                <span style={{ fontWeight: 800, color: ac, whiteSpace: "nowrap" }}>{usd(v.total)}</span>
+              </button>
+            ))}
+          </div>
+        </Modal>
       )}
 
       {inspeccion && (
