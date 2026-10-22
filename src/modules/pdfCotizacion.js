@@ -275,6 +275,7 @@ export function construirNotaCotizacion({ cotizacion, cliente, empresa, traslado
   const notas = [
     t.fechaTraslado ? `Fecha de traslado: ${t.fechaTraslado}` : "",
     t.transporta ? `Transporta: ${t.transporta}` : "",
+    t.cedula ? `C.I. del chofer: ${t.cedula}` : "",
     t.vehiculo ? `Vehículo / Placa: ${t.vehiculo}` : "",
     t.observaciones ? `Observaciones: ${t.observaciones}` : "",
   ].filter(Boolean);

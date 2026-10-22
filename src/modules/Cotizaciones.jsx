@@ -336,7 +336,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
   // chofer, vehículo, observaciones) son propios del traslado, no de la
   // cotización, así que se piden aquí cada vez.
   const abrirNota = q => {
-    setNotaForm({ fechaTraslado: hoy(), transporta: "", vehiculo: "", observaciones: "" });
+    setNotaForm({ fechaTraslado: hoy(), transporta: "", cedula: "", vehiculo: "", observaciones: "" });
     setNotaDe(q);
   };
 
@@ -512,6 +512,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
           </p>
           <Inp label="Fecha de traslado" type="date" value={notaForm.fechaTraslado} onChange={v => setNotaForm(f => ({ ...f, fechaTraslado: v }))} />
           <Inp label="Transporta / Chofer" value={notaForm.transporta} onChange={v => setNotaForm(f => ({ ...f, transporta: v }))} placeholder="Nombre de quien traslada" />
+          <Inp label="C.I. del chofer" value={notaForm.cedula} onChange={v => setNotaForm(f => ({ ...f, cedula: v }))} placeholder="Ej: V-14.930.796" />
           <Inp label="Vehículo / Placa" value={notaForm.vehiculo} onChange={v => setNotaForm(f => ({ ...f, vehiculo: v }))} placeholder="Ej: Ford 350 · AB123CD" />
           <Area label="Observaciones" value={notaForm.observaciones} onChange={v => setNotaForm(f => ({ ...f, observaciones: v }))} placeholder="Notas para el traslado (opcional)" />
           <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
