@@ -330,6 +330,21 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
     }
   };
 
+  // Nota de entrega a partir de la cotización: para que el personal pueda
+  // trasladar la mercancía con un documento, sin esperar a que pase a venta.
+  const generarNota = async q => {
+    setGenerando(true);
+    try {
+      const { construirNotaCotizacion, nombreArchivoNotaCot, entregarPDF } = await import("./pdfCotizacion.js");
+      const doc = construirNotaCotizacion({ cotizacion: q, cliente: cli(q.clienteId), empresa });
+      await entregarPDF(doc, nombreArchivoNotaCot(q));
+    } catch {
+      alert("No se pudo generar la nota. Inténtalo de nuevo.");
+    } finally {
+      setGenerando(false);
+    }
+  };
+
   const cli = id => clientes.find(c => c.id === id);
   const nc = id => cli(id)?.nombre || "—";
   const set = (campo, valor) => setForm(f => ({ ...f, [campo]: valor }));
@@ -466,10 +481,13 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
             <Btn onClick={() => generarPDF(detalle)} color={ac} full disabled={generando}>
               {generando ? "Generando…" : "📄 Generar PDF"}
             </Btn>
-            <Btn onClick={() => setDetalle(null)} color={TEXT_SUB} outline full>Cerrar</Btn>
+            <Btn onClick={() => generarNota(detalle)} color={ac} outline full disabled={generando}>
+              {generando ? "Generando…" : "🚚 Generar Nota"}
+            </Btn>
           </div>
+          <Btn onClick={() => setDetalle(null)} color={TEXT_SUB} outline full>Cerrar</Btn>
           <p style={{ margin: "10px 0 0", fontSize: 11, color: TEXT_SUB, textAlign: "center" }}>
-            En el móvil se abre el menú de compartir, para mandarlo por WhatsApp.
+            El PDF es el presupuesto; la Nota es para trasladar la mercancía. En el móvil se abre el menú de compartir (WhatsApp).
           </p>
         </Modal>
       )}

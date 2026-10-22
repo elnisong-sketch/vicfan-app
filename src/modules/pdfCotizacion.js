@@ -55,8 +55,9 @@ function pie(doc, empresa) {
  * @param opts.total    total en US$
  * @param opts.notas    líneas de nota (incluida garantía) resaltadas al final
  * @param opts.firma    muestra la línea "Recibí conforme" (nota de entrega)
+ * @param opts.sinPrecios  oculta precio, importe y total (nota de traslado)
  */
-function renderEstilo1(doc, { empresa, titulo, numero, fecha, cliente, pago, items, total, notas = [], firma = false }) {
+function renderEstilo1(doc, { empresa, titulo, numero, fecha, cliente, pago, items, total, notas = [], firma = false, sinPrecios = false }) {
   // ── Esquina decorativa ──────────────────────────────────────────────────────
   doc.setFillColor(...NEGRO).triangle(0, 0, 56, 0, 0, 42, "F");
   doc.setFillColor(...AMBER).triangle(0, 0, 40, 0, 0, 30, "F");
@@ -96,8 +97,9 @@ function renderEstilo1(doc, { empresa, titulo, numero, fecha, cliente, pago, ite
   doc.setFont("helvetica", "bold").setFontSize(11).setTextColor(...NEGRO);
   doc.text(`Nº ${numero || ""}`, ANCHO - MARGEN - 4, y0 + 2, { align: "right" });
   doc.setFont("helvetica", "normal").setFontSize(7.8).setTextColor(...TINTA);
-  doc.text("Precios en US$", ANCHO - MARGEN - 4, y0 + 7, { align: "right" });
-  if (fecha) doc.text(`Emitido ${fecha}`, ANCHO - MARGEN - 4, y0 + 11.5, { align: "right" });
+  let yBox = y0 + 7;
+  if (!sinPrecios) { doc.text("Precios en US$", ANCHO - MARGEN - 4, yBox, { align: "right" }); yBox += 4.5; }
+  if (fecha) doc.text(`Emitido ${fecha}`, ANCHO - MARGEN - 4, yBox, { align: "right" });
 
   // Pago
   let yHead = Math.max(ye, yc) + 2;
@@ -117,9 +119,13 @@ function renderEstilo1(doc, { empresa, titulo, numero, fecha, cliente, pago, ite
     doc.setFillColor(...NEGRO).rect(MARGEN, y, UTIL, 8, "F");
     doc.setFont("helvetica", "bold").setFontSize(8.5).setTextColor(...BLANCO);
     doc.text("Descripción", COL.desc, y + 5.3);
-    doc.text("Cant.", COL.cantC, y + 5.3, { align: "center" });
-    doc.text("Precio", COL.precioR, y + 5.3, { align: "right" });
-    doc.text("Importe", COL.importeR, y + 5.3, { align: "right" });
+    if (sinPrecios) {
+      doc.text("Cantidad", COL.importeR, y + 5.3, { align: "right" });
+    } else {
+      doc.text("Cant.", COL.cantC, y + 5.3, { align: "center" });
+      doc.text("Precio", COL.precioR, y + 5.3, { align: "right" });
+      doc.text("Importe", COL.importeR, y + 5.3, { align: "right" });
+    }
     y += 8;
   };
   cabecera();
@@ -143,34 +149,44 @@ function renderEstilo1(doc, { empresa, titulo, numero, fecha, cliente, pago, ite
       doc.text(lineasDet, COL.desc, yt);
       doc.setFontSize(8.5).setTextColor(...TINTA);
     }
-    const sub = Number(it.subtotal) || (Number(it.cantidad) || 0) * (Number(it.precio) || 0);
-    doc.text(String(it.cantidad ?? 1), COL.cantC, y + 5, { align: "center" });
-    doc.text(usd(it.precio), COL.precioR, y + 5, { align: "right" });
-    doc.text(usd(sub), COL.importeR, y + 5, { align: "right" });
+    if (sinPrecios) {
+      doc.text(String(it.cantidad ?? 1), COL.importeR, y + 5, { align: "right" });
+    } else {
+      const sub = Number(it.subtotal) || (Number(it.cantidad) || 0) * (Number(it.precio) || 0);
+      doc.text(String(it.cantidad ?? 1), COL.cantC, y + 5, { align: "center" });
+      doc.text(usd(it.precio), COL.precioR, y + 5, { align: "right" });
+      doc.text(usd(sub), COL.importeR, y + 5, { align: "right" });
+    }
     y += alto;
   });
 
   // Línea separadora
   doc.setDrawColor(...NEGRO).setLineWidth(0.3).line(MARGEN, y, ANCHO - MARGEN, y);
 
-  // Subtotal
-  y += 1;
-  doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(...TINTA);
-  doc.text("Subtotal", COL.precioR, y + 5, { align: "right" });
-  doc.setFont("helvetica", "bold");
-  doc.text(usd(total), COL.importeR, y + 5, { align: "right" });
-  y += 8;
+  // Totales (solo si el documento muestra precios; una nota de traslado para el
+  // personal NO los lleva: los empleados no deben ver precios).
+  if (!sinPrecios) {
+    // Subtotal
+    y += 1;
+    doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(...TINTA);
+    doc.text("Subtotal", COL.precioR, y + 5, { align: "right" });
+    doc.setFont("helvetica", "bold");
+    doc.text(usd(total), COL.importeR, y + 5, { align: "right" });
+    y += 8;
 
-  // Total (resaltado)
-  doc.setFillColor(...CREMA).rect(MARGEN, y, UTIL, 9, "F");
-  doc.setFont("helvetica", "bold").setFontSize(11).setTextColor(...NEGRO);
-  doc.text("Total US$", COL.precioR, y + 6, { align: "right" });
-  doc.text(usd(total), COL.importeR, y + 6, { align: "right" });
-  y += 16;
+    // Total (resaltado)
+    doc.setFillColor(...CREMA).rect(MARGEN, y, UTIL, 9, "F");
+    doc.setFont("helvetica", "bold").setFontSize(11).setTextColor(...NEGRO);
+    doc.text("Total US$", COL.precioR, y + 6, { align: "right" });
+    doc.text(usd(total), COL.importeR, y + 6, { align: "right" });
+    y += 16;
 
-  doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(...TINTA);
-  doc.text("Precios en dólares americanos (US$)", MARGEN, y);
-  y += 7;
+    doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(...TINTA);
+    doc.text("Precios en dólares americanos (US$)", MARGEN, y);
+    y += 7;
+  } else {
+    y += 4;
+  }
 
   // Notas resaltadas
   for (const n of notas.filter(Boolean)) {
@@ -183,12 +199,13 @@ function renderEstilo1(doc, { empresa, titulo, numero, fecha, cliente, pago, ite
     y += h + 3;
   }
 
-  // Firma (nota de entrega)
+  // Firma (nota de entrega), centrada
   if (firma) {
     y = Math.max(y + 6, ALTO - 40);
-    doc.setDrawColor(...GRIS).setLineWidth(0.3).line(MARGEN, y, MARGEN + 70, y);
+    const cx = ANCHO / 2;
+    doc.setDrawColor(...GRIS).setLineWidth(0.3).line(cx - 35, y, cx + 35, y);
     doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(...TINTA);
-    doc.text("Recibí conforme", MARGEN, y + 4);
+    doc.text("Recibí conforme", cx, y + 4, { align: "center" });
   }
 
   pie(doc, empresa);
@@ -245,6 +262,30 @@ export function construirNotaEntrega({ venta, cliente, empresa }) {
 }
 
 export const nombreArchivoNota = venta => `Nota-entrega-${venta.numero || "vicfan"}.pdf`;
+
+// ── NOTA A PARTIR DE UNA COTIZACIÓN ─────────────────────────────────────────────
+// Misma Nota de Entrega, pero generada directamente desde el presupuesto —sin
+// esperar a que pase a venta— para que el personal pueda trasladar la mercancía
+// con un documento que respalda qué lleva y para quién. Conserva el MISMO número
+// correlativo de la cotización (que la venta heredaría igual).
+export function construirNotaCotizacion({ cotizacion, cliente, empresa }) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  return renderEstilo1(doc, {
+    empresa,
+    titulo: "NOTA DE ENTREGA",
+    numero: cotizacion.numero || "",
+    fecha: cotizacion.fecha || "",
+    cliente,
+    pago: null,                 // sin condiciones de pago: el personal no ve nada de dinero
+    items: cotizacion.items || [],
+    total: cotizacion.total,
+    notas: [],
+    firma: true,
+    sinPrecios: true,           // los empleados nunca deben ver precios
+  });
+}
+
+export const nombreArchivoNotaCot = cotizacion => `Nota-entrega-${cotizacion.numero || "vicfan"}.pdf`;
 
 /**
  * Entrega el PDF por el mejor camino que admita el dispositivo: compartirlo
