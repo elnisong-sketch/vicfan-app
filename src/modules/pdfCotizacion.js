@@ -80,16 +80,17 @@ function renderEstilo1(doc, { empresa, titulo, numero, fecha, cliente, pago, ite
   doc.text(empresa?.nombre || "", MARGEN, ye); ye += 4.3;
   doc.setFont("helvetica", "normal").setFontSize(7.8).setTextColor(...GRIS);
   const lineasEmisor = [empresa?.rif, ...enLineas(empresa?.telefonos), empresa?.email, ...enLineas(empresa?.direccion)].filter(Boolean);
-  for (const l of lineasEmisor) { doc.text(partir(doc, l, 72), MARGEN, ye); ye += 3.7; }
+  for (const l of lineasEmisor) { const ll = partir(doc, l, 72); doc.text(ll, MARGEN, ye); ye += 3.7 * ll.length; }
 
   // Cliente
   const xCli = 86;
   etiqueta("Cliente", xCli);
   let yc = y0 + 5;
   doc.setFont("helvetica", "bold").setFontSize(9.5).setTextColor(...TINTA);
-  doc.text(partir(doc, cliente?.nombre || "—", 58), xCli, yc); yc += 4.3;
+  const lineasNomCli = partir(doc, cliente?.nombre || "—", 58);
+  doc.text(lineasNomCli, xCli, yc); yc += 4.3 * lineasNomCli.length;
   doc.setFont("helvetica", "normal").setFontSize(7.8).setTextColor(...GRIS);
-  for (const l of [cliente?.documento, ...enLineas(cliente?.direccion)].filter(Boolean)) { doc.text(partir(doc, l, 58), xCli, yc); yc += 3.7; }
+  for (const l of [cliente?.documento, ...enLineas(cliente?.direccion)].filter(Boolean)) { const ll = partir(doc, l, 58); doc.text(ll, xCli, yc); yc += 3.7 * ll.length; }
 
   // Caja del número
   const bx = 150, bw = ANCHO - MARGEN - bx;
