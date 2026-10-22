@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   ACENTOS, ESTADO_COLOR, BORDER, BG_INPUT, BG_CARD, TEXT_MAIN, TEXT_SUB, GREEN, RED,
   hoy, usd, uid,
-  Badge, Btn, Card, Inp, Sel, Modal, Etiqueta, estiloInput, CampoDocumento, unirDocumento,
+  Badge, Btn, Card, Inp, Area, Sel, Modal, Etiqueta, estiloInput, CampoDocumento, unirDocumento,
 } from "../ui.jsx";
 
 const ac = ACENTOS.cotizaciones;
@@ -304,6 +304,8 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [generando, setGenerando] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [notaDe, setNotaDe] = useState(null);     // cotización para la que se emite la Nota
+  const [notaForm, setNotaForm] = useState(null);  // datos de traslado de esa Nota
 
   // El PDF se construye aquí y se entrega como archivo. La impresión del
   // navegador no servía: dentro de una PWA instalada en Android, Chrome no
@@ -330,14 +332,23 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
     }
   };
 
+  // Abre el formulario de traslado antes de emitir la Nota. Los datos (fecha,
+  // chofer, vehículo, observaciones) son propios del traslado, no de la
+  // cotización, así que se piden aquí cada vez.
+  const abrirNota = q => {
+    setNotaForm({ fechaTraslado: hoy(), transporta: "", vehiculo: "", observaciones: "" });
+    setNotaDe(q);
+  };
+
   // Nota de entrega a partir de la cotización: para que el personal pueda
   // trasladar la mercancía con un documento, sin esperar a que pase a venta.
-  const generarNota = async q => {
+  const generarNota = async (q, traslado) => {
     setGenerando(true);
     try {
       const { construirNotaCotizacion, nombreArchivoNotaCot, entregarPDF } = await import("./pdfCotizacion.js");
-      const doc = construirNotaCotizacion({ cotizacion: q, cliente: cli(q.clienteId), empresa });
+      const doc = construirNotaCotizacion({ cotizacion: q, cliente: cli(q.clienteId), empresa, traslado });
       await entregarPDF(doc, nombreArchivoNotaCot(q));
+      setNotaDe(null);
     } catch {
       alert("No se pudo generar la nota. Inténtalo de nuevo.");
     } finally {
@@ -481,14 +492,34 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
             <Btn onClick={() => generarPDF(detalle)} color={ac} full disabled={generando}>
               {generando ? "Generando…" : "📄 Generar PDF"}
             </Btn>
-            <Btn onClick={() => generarNota(detalle)} color={ac} outline full disabled={generando}>
-              {generando ? "Generando…" : "🚚 Generar Nota"}
+            <Btn onClick={() => abrirNota(detalle)} color={ac} outline full disabled={generando}>
+              🚚 Generar Nota
             </Btn>
           </div>
           <Btn onClick={() => setDetalle(null)} color={TEXT_SUB} outline full>Cerrar</Btn>
           <p style={{ margin: "10px 0 0", fontSize: 11, color: TEXT_SUB, textAlign: "center" }}>
             El PDF es el presupuesto; la Nota es para trasladar la mercancía. En el móvil se abre el menú de compartir (WhatsApp).
           </p>
+        </Modal>
+      )}
+
+      {/* ── Datos de traslado para la Nota ── */}
+      {notaDe && notaForm && (
+        <Modal onClose={() => setNotaDe(null)}>
+          <h3 style={{ margin: "0 0 4px", color: ac }}>🚚 Nota de entrega</h3>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: TEXT_SUB }}>
+            Nº {numeroVisible(notaDe)} · {nc(notaDe.clienteId)}. Datos del traslado (opcionales). La Nota no muestra precios.
+          </p>
+          <Inp label="Fecha de traslado" type="date" value={notaForm.fechaTraslado} onChange={v => setNotaForm(f => ({ ...f, fechaTraslado: v }))} />
+          <Inp label="Transporta / Chofer" value={notaForm.transporta} onChange={v => setNotaForm(f => ({ ...f, transporta: v }))} placeholder="Nombre de quien traslada" />
+          <Inp label="Vehículo / Placa" value={notaForm.vehiculo} onChange={v => setNotaForm(f => ({ ...f, vehiculo: v }))} placeholder="Ej: Ford 350 · AB123CD" />
+          <Area label="Observaciones" value={notaForm.observaciones} onChange={v => setNotaForm(f => ({ ...f, observaciones: v }))} placeholder="Notas para el traslado (opcional)" />
+          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+            <Btn onClick={() => generarNota(notaDe, notaForm)} color={ac} full disabled={generando}>
+              {generando ? "Generando…" : "📄 Generar Nota"}
+            </Btn>
+            <Btn onClick={() => setNotaDe(null)} color={TEXT_SUB} outline full>Cancelar</Btn>
+          </div>
         </Modal>
       )}
 

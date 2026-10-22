@@ -269,8 +269,15 @@ export const nombreArchivoNota = venta => `Nota-entrega-${venta.numero || "vicfa
 // esperar a que pase a venta— para que el personal pueda trasladar la mercancía
 // con un documento que respalda qué lleva y para quién. Conserva el MISMO número
 // correlativo de la cotización (que la venta heredaría igual).
-export function construirNotaCotizacion({ cotizacion, cliente, empresa }) {
+export function construirNotaCotizacion({ cotizacion, cliente, empresa, traslado }) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const t = traslado || {};
+  const notas = [
+    t.fechaTraslado ? `Fecha de traslado: ${t.fechaTraslado}` : "",
+    t.transporta ? `Transporta: ${t.transporta}` : "",
+    t.vehiculo ? `Vehículo / Placa: ${t.vehiculo}` : "",
+    t.observaciones ? `Observaciones: ${t.observaciones}` : "",
+  ].filter(Boolean);
   return renderEstilo1(doc, {
     empresa,
     titulo: "NOTA DE ENTREGA",
@@ -280,7 +287,7 @@ export function construirNotaCotizacion({ cotizacion, cliente, empresa }) {
     pago: null,                 // sin condiciones de pago: el personal no ve nada de dinero
     items: cotizacion.items || [],
     total: cotizacion.total,
-    notas: [],
+    notas,
     firma: true,
     sinPrecios: true,           // los empleados nunca deben ver precios
   });
