@@ -881,11 +881,6 @@ const INICIAL_MES = ["E", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
  * enseña cuánto de lo vendido está todavía por cobrar.
  */
 function ModuloBienvenida({ setTab, stats, onNuevo, onStockBajo, ventas = [], tareas = [], clientes = [], tecnicos = [] }) {
-  const secciones = TABS.map(t => ({ ...t, color: ACENTOS[t.id] }));
-  // Los atajos a las secciones solo valen cuando el menú está escondido. Con el
-  // menú fijo a la izquierda son la misma lista dos veces, una debajo de otra.
-  const menuFijo = usePantallaAncha();
-
   const hoyISO = hoy();
   const primeroDeMes = hoyISO.slice(0, 8) + "01";
   const vivas = ventas.filter(v => v.estado !== "Cancelada");
@@ -1105,15 +1100,6 @@ function ModuloBienvenida({ setTab, stats, onNuevo, onStockBajo, ventas = [], ta
           );
         })}
       </Panel>
-
-      <div style={{ display: menuFijo ? "none" : "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 6 }}>
-        {secciones.map(s => (
-          <button key={s.id} onClick={() => setTab(s.id)} style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderTop: `3px solid ${s.color}`, borderRadius: 14, padding: "16px 8px", cursor: "pointer", textAlign: "center", boxShadow: "0 2px 8px #0001" }}>
-            <div style={{ fontSize: 24, marginBottom: 6 }}>{s.icon}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: TEXT_MAIN }}>{s.label}</div>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
