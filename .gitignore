@@ -30,3 +30,6 @@ dist-ssr
 
 # Copias de seguridad con datos de clientes: nunca al repositorio
 backup-vicfan-*.json
+
+# Firebase (cache local del despliegue)
+.firebase/
