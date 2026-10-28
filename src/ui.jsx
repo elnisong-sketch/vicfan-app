@@ -221,7 +221,7 @@ export function CampoImagen({ label, valor, onCambio, preparar, ayuda, alto = 90
 /** Fila de botones-pastilla para filtrar. `opciones` = [{ value, label }] */
 export function Chips({ value, onChange, opciones, color }) {
   return (
-    <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 12, scrollbarWidth: "none" }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
       {opciones.map(o => {
         const activo = value === o.value;
         return (
