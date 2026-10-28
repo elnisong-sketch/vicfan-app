@@ -901,14 +901,15 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>{esTecnico ? "📅 Mi día" : "📅 Tareas"}</h2>
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ color: ac, margin: "0 0 10px", fontSize: 20, fontWeight: 900 }}>{esTecnico ? "📅 Mi día" : "📅 Tareas"}</h2>
         {/* Las tareas en general las crea la oficina. Las inspecciones las
-            puede abrir también un técnico: las encuentra él en la calle. */}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <Btn onClick={() => setInspeccion(true)} color={ACENTOS.operaciones} small>+ Inspección</Btn>
-          {!esTecnico && <Btn onClick={() => setMenuAPartir(true)} color={ac} outline small>A partir de…</Btn>}
+            puede abrir también un técnico: las encuentra él en la calle.
+            «+ Nueva» es la acción principal; las otras dos van discretas. */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {!esTecnico && <Btn onClick={() => setMenuNueva(true)} color={ac} small>+ Nueva</Btn>}
+          <Btn onClick={() => setInspeccion(true)} color={ACENTOS.operaciones} outline={!esTecnico} small>+ Inspección</Btn>
+          {!esTecnico && <Btn onClick={() => setMenuAPartir(true)} color={ac} outline small>A partir de…</Btn>}
         </div>
       </div>
 

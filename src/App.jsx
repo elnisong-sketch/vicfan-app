@@ -1106,7 +1106,14 @@ function ModuloBienvenida({ setTab, stats, onNuevo, onStockBajo, ventas = [], ta
 
 // ── APP PRINCIPAL ─────────────────────────────────────────────────────────────
 export default function App() {
-  const [tab, setTab]                   = useState("inicio");
+  // La pestaña se recuerda mientras la sesión siga abierta: si cierran y
+  // reabren la app SIN salir, vuelven donde estaban. Al cerrar sesión se
+  // olvida (ver `salir`), de modo que al volver a entrar se empieza en el
+  // Panel del mes.
+  const [tab, setTab]                   = useState(() => {
+    try { return localStorage.getItem("vf_tab") || "inicio"; } catch { return "inicio"; }
+  });
+  useEffect(() => { try { localStorage.setItem("vf_tab", tab); } catch { /* modo privado */ } }, [tab]);
   // El menú vive fijo a la izquierda si la pantalla da de sí; si no, es un
   // cajón y `menuAbierto` dice si está fuera.
   const menuFijo = usePantallaAncha();
@@ -1582,7 +1589,7 @@ export default function App() {
   if (!sesion) return <PantallaLogin />;
 
   const esTecnico = sesion.rol === "tecnico";
-  const salir = () => { cerrarSesion().catch(() => {}); setTab("inicio"); };
+  const salir = () => { cerrarSesion().catch(() => {}); try { localStorage.removeItem("vf_tab"); } catch { /* modo privado */ } setTab("inicio"); };
 
   const abierta = t => t.estado === "Programada" || t.estado === "En proceso";
   // Un técnico solo cuenta lo suyo; la oficina cuenta todo.
