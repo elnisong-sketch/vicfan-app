@@ -16,7 +16,8 @@ const yaInstalada = () =>
 const esIOS = () =>
   /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
 
-export default function AvisoInstalar() {
+export default function AvisoInstalar({ tema = "claro" } = {}) {
+  const oscuro = tema === "oscuro";                // sobre el fondo navy del login
   const [evento, setEvento] = useState(null);     // Android/Chrome
   const [mostrarIOS, setMostrarIOS] = useState(false);
   const [oculto, setOculto] = useState(() => {
@@ -50,19 +51,24 @@ export default function AvisoInstalar() {
 
   if (oculto || yaInstalada() || (!evento && !mostrarIOS)) return null;
 
+  const cBg = oscuro ? "#ffffff10" : BG_CARD;
+  const cBorde = oscuro ? "#ffffff22" : BORDER;
+  const cTitulo = oscuro ? "#ffffff" : TEXT_MAIN;
+  const cTexto = oscuro ? "#94b4d4" : TEXT_SUB;
+
   return (
-    <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderLeft: `4px solid ${ACENTOS.tareas}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+    <div style={{ background: cBg, border: `1px solid ${cBorde}`, borderLeft: `4px solid ${ACENTOS.tareas}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
         <div style={{ flex: 1 }}>
-          <p style={{ margin: "0 0 4px", fontWeight: 800, fontSize: 14, color: TEXT_MAIN }}>📲 Instala VICFAN en tu móvil</p>
-          <p style={{ margin: 0, fontSize: 12.5, color: TEXT_SUB, lineHeight: 1.55 }}>
+          <p style={{ margin: "0 0 4px", fontWeight: 800, fontSize: 14, color: cTitulo }}>📲 Instala VICFAN en tu móvil</p>
+          <p style={{ margin: 0, fontSize: 12.5, color: cTexto, lineHeight: 1.55 }}>
             {evento
               ? "Se abre a pantalla completa, con su icono, y funciona aunque te quedes sin señal."
               : "Toca el botón de compartir de Safari y elige “Añadir a pantalla de inicio”."}
           </p>
         </div>
         <button onClick={descartar} aria-label="Descartar"
-          style={{ background: "none", border: "none", color: TEXT_SUB, fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
+          style={{ background: "none", border: "none", color: cTexto, fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
       </div>
       {evento && (
         <div style={{ marginTop: 10 }}>

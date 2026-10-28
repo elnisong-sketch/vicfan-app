@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NAVY, ORANGE, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB } from "./ui.jsx";
 import { entrar, mensajeDeError } from "./auth.js";
+import AvisoInstalar from "./instalar.jsx";
 
 // Pantalla de acceso.
 //
@@ -82,6 +83,12 @@ export default function PantallaLogin() {
         Solo tienes que entrar una vez en este teléfono.<br />
         ¿No tienes cuenta? Pídesela a la oficina.
       </p>
+
+      {/* Invitación a instalar, también antes de entrar: así cualquiera que
+          abra el enlace (en Vercel o en Firebase) ve de una cómo descargarla. */}
+      <div style={{ width: "100%", maxWidth: 340, marginTop: 22 }}>
+        <AvisoInstalar tema="oscuro" />
+      </div>
     </div>
   );
 }
