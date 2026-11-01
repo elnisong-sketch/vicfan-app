@@ -1565,7 +1565,7 @@ export default function App() {
   // Mientras Firebase recuerda si ya había sesión, no se enseña nada: si no,
   // parpadearía la pantalla de acceso cada vez que se abre la app.
   if (cargandoSesion) {
-    return <div style={{ minHeight: "100vh", background: NAVY, display: "grid", placeItems: "center", color: "#94b4d4", fontFamily: "'Inter', sans-serif", fontSize: 14 }}>Cargando…</div>;
+    return <div style={{ minHeight: "100vh", background: NAVY, display: "grid", placeItems: "center", color: "#a9a39a", fontFamily: "'Inter', sans-serif", fontSize: 14 }}>Cargando…</div>;
   }
   // Cuenta valida pero sin permiso asignado. Pasa si alguien se registra por su
   // cuenta, o si la oficina le retiro el acceso mientras estaba dentro.
@@ -1574,7 +1574,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", background: NAVY, display: "grid", placeItems: "center", padding: 24, fontFamily: "'Inter', sans-serif" }}>
         <div style={{ maxWidth: 320, textAlign: "center" }}>
           <p style={{ color: "#fff", fontSize: 18, fontWeight: 800, margin: "0 0 8px" }}>Sin acceso</p>
-          <p style={{ color: "#94b4d4", fontSize: 14, lineHeight: 1.6, margin: "0 0 20px" }}>
+          <p style={{ color: "#a9a39a", fontSize: 14, lineHeight: 1.6, margin: "0 0 20px" }}>
             Tu cuenta existe, pero la oficina todavía no te ha dado permiso para entrar.
           </p>
           <button onClick={() => cerrarSesion()}
@@ -1629,7 +1629,7 @@ export default function App() {
   const marca = (
     <>
       <h1 style={{ color: "#fff", margin: 0, fontSize: 21, fontWeight: 700, letterSpacing: "-1px" }}>⚡ VICFAN</h1>
-      <p style={{ color: "#94b4d4", margin: 0, fontSize: 11 }}>{esTecnico ? `👷 ${sesion.nombre}` : "Generadores GENERAC"}</p>
+      <p style={{ color: "#a9a39a", margin: 0, fontSize: 11 }}>{esTecnico ? `👷 ${sesion.nombre}` : "Generadores GENERAC"}</p>
     </>
   );
 

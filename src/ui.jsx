@@ -1,8 +1,12 @@
 import { useState } from "react";
 
 // ── PALETA ────────────────────────────────────────────────────────────────────
-export const NAVY      = "#0d1b2e";
-export const ORANGE    = "#f26522";
+// Colores del logo de VICFAN: negro de fondo y el dorado/ámbar de "GENERAC
+// VZLA" y el rayo. El dorado es intenso pero algo profundo a propósito, para
+// que el texto en dorado (importes, avisos, etiquetas) se siga leyendo sobre
+// fondo blanco igual que antes se leía el naranja.
+export const NAVY      = "#0b0b0b";
+export const ORANGE    = "#c8860a";
 export const GREEN     = "#10b981";
 export const RED        = "#ef4444";
 export const BG_APP    = "#f0f4f8";
@@ -15,7 +19,7 @@ export const TEXT_SUB  = "#64748b";
 export const ACENTOS = {
   inicio:       NAVY,
   clientes:     "#6366f1",
-  cotizaciones: "#f26522",
+  cotizaciones: ORANGE,
   ventas:       "#10b981",
   tareas:       "#0ea5e9",
   operaciones:  "#14b8a6",

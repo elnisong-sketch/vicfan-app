@@ -54,7 +54,7 @@ export default function AvisoInstalar({ tema = "claro" } = {}) {
   const cBg = oscuro ? "#ffffff10" : BG_CARD;
   const cBorde = oscuro ? "#ffffff22" : BORDER;
   const cTitulo = oscuro ? "#ffffff" : TEXT_MAIN;
-  const cTexto = oscuro ? "#94b4d4" : TEXT_SUB;
+  const cTexto = oscuro ? "#a9a39a" : TEXT_SUB;
 
   return (
     <div style={{ background: cBg, border: `1px solid ${cBorde}`, borderLeft: `4px solid ${ACENTOS.tareas}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>

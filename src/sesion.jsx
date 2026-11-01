@@ -41,18 +41,18 @@ export default function PantallaLogin() {
     <div style={{ minHeight: "100vh", background: NAVY, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, paddingTop: "calc(24px + env(safe-area-inset-top))", fontFamily: "'Inter', 'Helvetica Neue', sans-serif" }}>
       <div style={{ textAlign: "center", marginBottom: 30 }}>
         <h1 style={{ color: "#fff", margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: "-1.5px" }}>⚡ VICFAN</h1>
-        <p style={{ color: "#94b4d4", margin: "2px 0 0", fontSize: 13 }}>Generadores GENERAC</p>
+        <p style={{ color: "#a9a39a", margin: "2px 0 0", fontSize: 13 }}>Generadores GENERAC</p>
       </div>
 
       <form onSubmit={enviar} style={{ width: "100%", maxWidth: 340 }}>
-        <label style={{ display: "block", color: "#94b4d4", fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Correo</label>
+        <label style={{ display: "block", color: "#a9a39a", fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Correo</label>
         <input
           type="email" inputMode="email" autoComplete="username" autoCapitalize="none" autoCorrect="off"
           value={correo} onChange={e => setCorreo(e.target.value)}
           placeholder="tucorreo@ejemplo.com" style={campo} disabled={entrando}
         />
 
-        <label style={{ display: "block", color: "#94b4d4", fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Contraseña</label>
+        <label style={{ display: "block", color: "#a9a39a", fontSize: 12, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Contraseña</label>
         <div style={{ position: "relative" }}>
           <input
             type={verClave ? "text" : "password"} autoComplete="current-password"
@@ -79,7 +79,7 @@ export default function PantallaLogin() {
         </button>
       </form>
 
-      <p style={{ color: "#94b4d4", fontSize: 12, marginTop: 24, textAlign: "center", maxWidth: 300, lineHeight: 1.6 }}>
+      <p style={{ color: "#a9a39a", fontSize: 12, marginTop: 24, textAlign: "center", maxWidth: 300, lineHeight: 1.6 }}>
         Solo tienes que entrar una vez en este teléfono.<br />
         ¿No tienes cuenta? Pídesela a la oficina.
       </p>
