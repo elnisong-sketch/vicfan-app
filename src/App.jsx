@@ -107,7 +107,7 @@ function ModuloClientes({ clientes, setClientes }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>👥 Clientes</h2>
+        <h2 style={{ color: TEXT_MAIN, margin: 0, fontSize: 18, fontWeight: 900 }}>👥 Clientes</h2>
         <Btn onClick={() => { setForm({ id: uid(), nombre: "", tipoDoc: "V", documento: "", telefono: "", email: "", direccion: "", tipo: "Residencial", notas: "" }); setModal(true); }} color={ac} small>+ Nuevo</Btn>
       </div>
       <Inp placeholder="Buscar..." value={busqueda} onChange={setBusqueda} />
@@ -231,7 +231,7 @@ function ModuloVentas({ ventas, setVentas, clientes, setClientes, inventario, re
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>💰 Ventas</h2>
+        <h2 style={{ color: TEXT_MAIN, margin: 0, fontSize: 18, fontWeight: 900 }}>💰 Ventas</h2>
         <Btn onClick={abrir} color={ac} small>+ Venta directa</Btn>
       </div>
 
@@ -473,7 +473,7 @@ function ModuloInventario({ inventario, setInventario, repuestos, setRepuestos, 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>📦 Inventario</h2>
+        <h2 style={{ color: TEXT_MAIN, margin: 0, fontSize: 18, fontWeight: 900 }}>📦 Inventario</h2>
         {(sub === "modelos" || sub === "repuestos") && <Btn onClick={() => { setForm(sub === "modelos" ? { id: uid(), codigo: "", nombre: "", potencia: "", combustible: "Gasolina", precio: 0, stock: 0 } : { id: uid(), codigo: "", nombre: "", precio: 0, stock: 0 }); setModal(true); }} color={ac} small>+ Nuevo</Btn>}
         {sub === "kit" && <Btn onClick={() => setReponer(true)} color={ac} small>+ Reponer kit</Btn>}
       </div>
@@ -670,7 +670,7 @@ function ModuloGarantias({ garantias, clientes }) {
   const diasRestantes = g => diasHasta(venceDe(g));
   return (
     <div>
-      <h2 style={{ color: ac, margin: "0 0 16px", fontSize: 18, fontWeight: 900 }}>🛡️ Garantías</h2>
+      <h2 style={{ color: TEXT_MAIN, margin: "0 0 16px", fontSize: 18, fontWeight: 900 }}>🛡️ Garantías</h2>
       {garantias.length === 0 && <p style={{ color: TEXT_SUB, textAlign: "center", marginTop: 40 }}>Sin garantías todavía. Se activan desde cada instalación, el día de la puesta en marcha.</p>}
       {[...garantias].sort((a, b) => venceDe(a).localeCompare(venceDe(b))).map(g => {
         const dias = diasRestantes(g);
@@ -727,7 +727,7 @@ function ModuloAdmin({ tecnicos, setTecnicos, exportarDatos, restaurarDatos, emp
   };
   return (
     <div>
-      <h2 style={{ color: ac, margin: "0 0 16px", fontSize: 18, fontWeight: 900 }}>⚙️ Administración</h2>
+      <h2 style={{ color: TEXT_MAIN, margin: "0 0 16px", fontSize: 18, fontWeight: 900 }}>⚙️ Administración</h2>
       <button onClick={exportarDatos} style={{ width: "100%", background: NAVY, border: "none", borderRadius: 12, color: "#fff", padding: "13px", fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}>📤 Exportar Backup</button>
 
       {!copia ? (

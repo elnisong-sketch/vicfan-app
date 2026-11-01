@@ -398,7 +398,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ color: ac, margin: 0, fontSize: 18, fontWeight: 900 }}>📋 Cotizaciones</h2>
+        <h2 style={{ color: TEXT_MAIN, margin: 0, fontSize: 18, fontWeight: 900 }}>📋 Cotizaciones</h2>
         <Btn onClick={abrirNueva} color={ac} small>+ Nueva</Btn>
       </div>
 

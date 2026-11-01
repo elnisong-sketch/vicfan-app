@@ -16,26 +16,33 @@ export const BORDER    = "#e2e8f0";
 export const TEXT_MAIN = "#1e293b";
 export const TEXT_SUB  = "#64748b";
 
+// Una sola paleta en toda la app: el dorado del logo es el único acento.
+// Antes cada sección tenía su color (azul, verde, morado…); ahora todas
+// comparten el dorado para un aspecto más serio y uniforme. Lo que distingue
+// a cada sección es su icono y su título, no el color.
 export const ACENTOS = {
-  inicio:       NAVY,
-  clientes:     "#6366f1",
+  inicio:       ORANGE,
+  clientes:     ORANGE,
   cotizaciones: ORANGE,
-  ventas:       "#10b981",
-  tareas:       "#0ea5e9",
-  operaciones:  "#14b8a6",
-  inventario:   "#8b5cf6",
-  garantias:    "#ec4899",
-  admin:        "#64748b",
+  ventas:       ORANGE,
+  tareas:       ORANGE,
+  operaciones:  ORANGE,
+  inventario:   ORANGE,
+  garantias:    ORANGE,
+  admin:        ORANGE,
 };
 
+// Los estados van en gris (neutro) salvo cuando de verdad significan algo:
+// verde = todo bien (aprobada, cobrada, completada, vigente) y rojo = problema
+// (rechazada, cancelada, vencida). Así el color siempre informa, no decora.
 export const ESTADO_COLOR = {
-  "Pendiente": "#f59e0b", "Aprobada": GREEN, "Rechazada": RED,
-  "Cobrada": GREEN, "Pendiente cobro": "#f59e0b", "Cancelada": RED,
-  "Programada": "#0ea5e9", "En proceso": ORANGE, "Completada": GREEN,
+  "Pendiente": TEXT_SUB, "Aprobada": GREEN, "Rechazada": RED,
+  "Cobrada": GREEN, "Pendiente cobro": TEXT_SUB, "Cancelada": RED,
+  "Programada": TEXT_SUB, "En proceso": TEXT_SUB, "Completada": GREEN,
   "Vigente": GREEN, "Vencida": RED,
 };
 
-export const PRIORIDAD_COLOR = { "Normal": TEXT_SUB, "Alta": "#f59e0b", "Urgente": RED };
+export const PRIORIDAD_COLOR = { "Normal": TEXT_SUB, "Alta": ORANGE, "Urgente": RED };
 
 // ── HELPERS DE FECHA ──────────────────────────────────────────────────────────
 // Todo el sistema funciona en hora de Venezuela, no en la del dispositivo.
@@ -222,15 +229,17 @@ export function CampoImagen({ label, valor, onCambio, preparar, ayuda, alto = 90
   );
 }
 
-/** Fila de botones-pastilla para filtrar. `opciones` = [{ value, label }] */
-export function Chips({ value, onChange, opciones, color }) {
+/** Fila de botones-pastilla para filtrar. `opciones` = [{ value, label }]
+ *  El filtro activo va en negro (la estructura de la paleta), no en el color
+ *  de la sección: así el dorado queda reservado para las acciones. */
+export function Chips({ value, onChange, opciones }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
       {opciones.map(o => {
         const activo = value === o.value;
         return (
           <button key={o.value} onClick={() => onChange(o.value)}
-            style={{ flex: "0 0 auto", background: activo ? color : BG_CARD, color: activo ? "#fff" : TEXT_SUB, border: `1.5px solid ${activo ? color : BORDER}`, borderRadius: 50, padding: "7px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+            style={{ flex: "0 0 auto", background: activo ? NAVY : BG_CARD, color: activo ? "#fff" : TEXT_SUB, border: `1.5px solid ${activo ? NAVY : BORDER}`, borderRadius: 50, padding: "7px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
             {o.label}
           </button>
         );

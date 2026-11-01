@@ -902,7 +902,7 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ color: ac, margin: "0 0 10px", fontSize: 20, fontWeight: 900 }}>{esTecnico ? "📅 Mi día" : "📅 Tareas"}</h2>
+        <h2 style={{ color: TEXT_MAIN, margin: "0 0 10px", fontSize: 20, fontWeight: 900 }}>{esTecnico ? "📅 Mi día" : "📅 Tareas"}</h2>
         {/* Las tareas en general las crea la oficina. Las inspecciones las
             puede abrir también un técnico: las encuentra él en la calle.
             «+ Nueva» es la acción principal; las otras dos van discretas. */}
