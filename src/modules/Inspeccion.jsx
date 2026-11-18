@@ -25,7 +25,7 @@ export function SelectorCliente({ clientes, valor, onCambio, onCrear }) {
         <select value={valor} style={{ ...estiloInput, flex: 1, minWidth: 0 }}
           onChange={e => onCambio(e.target.value, clientes.find(c => c.id === e.target.value))}>
           <option value="">{clientes.length ? "— Selecciona un cliente —" : "— Aún no hay clientes —"}</option>
-          {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          {[...clientes].sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" })).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
         <button type="button" onClick={() => setCreando(true)}
           style={{ flex: "0 0 auto", background: ACENTOS.clientes || ac, color: "#fff", border: "none", borderRadius: 10, padding: "0 14px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>

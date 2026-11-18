@@ -554,7 +554,7 @@ export default function ModuloCotizaciones({ cotizaciones, setCotizaciones, vent
                 <select value={form.clienteId} onChange={e => set("clienteId", e.target.value)}
                   style={{ ...estiloInput, flex: 1, minWidth: 0 }}>
                   <option value="">{clientes.length ? "— Selecciona un cliente —" : "— Aún no hay clientes —"}</option>
-                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  {[...clientes].sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" })).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
                 <button type="button" onClick={() => setCreandoCliente(true)}
                   style={{ flex: "0 0 auto", background: ACENTOS.clientes, color: "#fff", border: "none", borderRadius: 10, padding: "0 14px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
