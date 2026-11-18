@@ -863,7 +863,9 @@ export default function ModuloTareas({ tareas, setTareas, clientes, setClientes,
     setForm(null);
   };
 
-  const nueva = () => { setMenuNueva(false); setForm({ ...tareaVacia(clientes[0]?.id), fecha: vista === "semana" ? baseSemana : hoy() }); };
+  // Sin cliente por defecto: que lo elija la oficina, para no crear tareas a
+  // nombre de quien resulte ser el primero de la lista (ni heredar su dirección).
+  const nueva = () => { setMenuNueva(false); setForm({ ...tareaVacia(""), fecha: vista === "semana" ? baseSemana : hoy() }); };
   // Tarea interna del equipo (sin cliente ni visita): lavar la furgoneta, etc.
   const nuevaInterna = () => { setMenuNueva(false); setForm({ ...tareaVacia(""), tipo: "Interna", duracionDias: 1, fecha: vista === "semana" ? baseSemana : hoy() }); };
 
