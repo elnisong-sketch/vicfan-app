@@ -3,7 +3,7 @@ import { useColeccion } from "./datos.js";
 import {
   NAVY, ORANGE, GREEN, RED, BG_APP, BG_CARD, BORDER, TEXT_MAIN, TEXT_SUB,
   ACENTOS, ESTADO_COLOR, hoy, usd, uid, sumarMeses, fechaCorta,
-  Badge, Btn, Card, Inp, Sel, Modal, CampoImagen, estiloInput, Etiqueta, CampoDocumento, partesDocumento, unirDocumento,
+  Badge, Btn, Card, Inp, Buscador, Sel, Modal, CampoImagen, estiloInput, Etiqueta, CampoDocumento, partesDocumento, unirDocumento,
 } from "./ui.jsx";
 import { prepararImagen, prepararLogo } from "./imagenes.js";
 import ModuloTareas, { registrar, tareaVacia } from "./modules/Tareas.jsx";
@@ -103,14 +103,16 @@ function ModuloClientes({ clientes, setClientes }) {
   const [busqueda, setBusqueda] = useState("");
   const ac = ACENTOS.clientes;
   const guardar = () => { if (!form.nombre?.trim()) return; const limpio = { ...form, documento: unirDocumento(form.tipoDoc, form.documento) }; setClientes(p => p.find(x => x.id === limpio.id) ? p.map(x => x.id === limpio.id ? limpio : x) : [...p, limpio]); setModal(false); };
-  const filtrados = clientes.filter(c => c.nombre.toLowerCase().includes(busqueda.toLowerCase()) || c.telefono.includes(busqueda));
+  const filtrados = clientes
+    .filter(c => c.nombre.toLowerCase().includes(busqueda.toLowerCase()) || c.telefono.includes(busqueda))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }));
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 style={{ color: TEXT_MAIN, margin: 0, fontSize: 18, fontWeight: 900 }}>👥 Clientes</h2>
         <Btn onClick={() => { setForm({ id: uid(), nombre: "", tipoDoc: "V", documento: "", telefono: "", email: "", direccion: "", tipo: "Residencial", notas: "" }); setModal(true); }} color={ac} small>+ Nuevo</Btn>
       </div>
-      <Inp placeholder="Buscar..." value={busqueda} onChange={setBusqueda} />
+      <Buscador placeholder="Buscar cliente por nombre o teléfono" value={busqueda} onChange={setBusqueda} />
       {filtrados.map(c => (
         <Card key={c.id}>
           <div style={{ display: "flex", justifyContent: "space-between" }}>

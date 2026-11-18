@@ -152,6 +152,19 @@ export function Etiqueta({ children }) {
   return <label style={{ fontSize: 12, fontWeight: 700, color: TEXT_SUB, textTransform: "uppercase", display: "block", marginBottom: 6 }}>{children}</label>;
 }
 
+/** Caja de búsqueda bien visible: fondo blanco, borde marcado y lupa.
+ *  Un Inp normal usa un fondo casi igual al de la pantalla y, fuera de una
+ *  tarjeta, en el móvil apenas se distingue; esto se nota siempre como campo. */
+export function Buscador({ value, onChange, placeholder = "Buscar…" }) {
+  return (
+    <div style={{ position: "relative", marginBottom: 14 }}>
+      <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", fontSize: 15, pointerEvents: "none" }}>🔍</span>
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ width: "100%", background: BG_CARD, border: "1.5px solid #cbd5e1", borderRadius: 10, color: TEXT_MAIN, padding: "12px 14px 12px 40px", fontSize: 15, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+    </div>
+  );
+}
+
 export function Inp({ label, value, onChange, type = "text", placeholder, style }) {
   return (
     <div style={{ marginBottom: 14 }}>
